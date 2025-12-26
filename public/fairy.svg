@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 240">
+  <defs>
+    <linearGradient id="wingGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:rgb(255,235,150);stop-opacity:0.9" />
+      <stop offset="100%" style="stop-color:rgb(200,180,255);stop-opacity:0.7" />
+    </linearGradient>
+    <linearGradient id="dressGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:rgb(220,180,255);stop-opacity:0.9" />
+      <stop offset="100%" style="stop-color:rgb(180,140,220);stop-opacity:0.8" />
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur" />
+      <feMerge>
+        <feMergeNode in="coloredBlur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Magic wand sparkles trail -->
+  <circle cx="45" cy="50" r="3" fill="#ffd93d" opacity="1" />
+  <circle cx="40" cy="65" r="2.5" fill="#ffd93d" opacity="0.95" />
+  <circle cx="50" cy="70" r="3" fill="#ffd93d" opacity="1" />
+  <circle cx="35" cy="75" r="2" fill="#ffd93d" opacity="0.9" />
+  <circle cx="55" cy="80" r="2.5" fill="#ffd93d" opacity="0.95" />
+  <circle cx="42" cy="85" r="3" fill="#ffd93d" opacity="1" />
+  <circle cx="48" cy="95" r="2.5" fill="#ffd93d" opacity="0.95" />
+  <circle cx="38" cy="100" r="2" fill="#ffd93d" opacity="0.9" />
+  <circle cx="52" cy="105" r="3" fill="#ffd93d" opacity="1" />
+  <circle cx="43" cy="58" r="1.5" fill="#ffd93d" opacity="0.85" />
+  <circle cx="47" cy="62" r="1.5" fill="#ffd93d" opacity="0.85" />
+  
+  <!-- Star burst from wand -->
+  <path d="M 85 35 L 88 30 L 85 32 L 82 30 Z M 85 35 L 88 40 L 85 38 L 82 40 Z M 85 35 L 90 35 L 88 32 L 90 38 Z M 85 35 L 80 35 L 82 32 L 80 38 Z" fill="#ffd93d" opacity="1" filter="url(#glow)" />
+  
+  <!-- Magic wand -->
+  <line x1="85" y1="35" x2="85" y2="65" stroke="rgb(180,140,100)" stroke-width="2.5" opacity="0.95" stroke-linecap="round" />
+  
+  <!-- Fairy wings - left wing -->
+  <path d="M 70 70 Q 50 60 45 75 Q 50 90 70 85 Q 75 80 70 70" fill="url(#wingGrad)" opacity="0.9" />
+  <path d="M 72 72 Q 55 65 50 77 Q 55 87 72 83" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="0.8" />
+  <path d="M 68 75 L 52 70 L 68 80" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="0.5" />
+  
+  <!-- Fairy wings - right wing -->
+  <path d="M 110 70 Q 130 60 135 75 Q 130 90 110 85 Q 105 80 110 70" fill="url(#wingGrad)" opacity="0.9" />
+  <path d="M 108 72 Q 125 65 130 77 Q 125 87 108 83" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="0.8" />
+  <path d="M 112 75 L 128 70 L 112 80" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="0.5" />
+  
+  <!-- Fairy dress (purple sparkly) -->
+  <path d="M 90 110 Q 75 115 75 130 Q 75 145 90 150 Q 105 145 105 130 Q 105 115 90 110" fill="url(#dressGrad)" />
+  
+  <!-- Dress sparkles -->
+  <circle cx="82" cy="125" r="1.5" fill="rgba(255,255,255,0.9)" />
+  <circle cx="98" cy="130" r="1.5" fill="rgba(255,255,255,0.9)" />
+  <circle cx="88" cy="135" r="1.5" fill="rgba(255,255,255,0.9)" />
+  <circle cx="85" cy="128" r="1" fill="rgba(255,255,255,0.8)" />
+  <circle cx="95" cy="133" r="1" fill="rgba(255,255,255,0.8)" />
+  
+  <!-- Fairy body/arms -->
+  <ellipse cx="90" cy="105" rx="5" ry="8" fill="rgba(255,230,200,0.95)" />
+  <line x1="82" y1="100" x2="75" y2="95" stroke="rgba(255,230,200,0.95)" stroke-width="3.5" stroke-linecap="round" />
+  <line x1="98" y1="100" x2="105" y2="95" stroke="rgba(255,230,200,0.95)" stroke-width="3.5" stroke-linecap="round" />
+  
+  <!-- Hands holding wand -->
+  <circle cx="82" cy="96" r="3" fill="rgba(255,230,200,0.95)" />
+  <circle cx="88" cy="95" r="3" fill="rgba(255,230,200,0.95)" />
+  
+  <!-- Fairy head -->
+  <circle cx="90" cy="80" r="9" fill="rgba(255,230,200,0.95)" />
+  
+  <!-- Blonde hair bun -->
+  <circle cx="90" cy="72" r="7" fill="rgba(255,235,180,0.98)" />
+  <circle cx="88" cy="70" r="2" fill="rgba(255,235,180,0.98)" />
+  <circle cx="92" cy="70" r="2" fill="rgba(255,235,180,0.98)" />
+  
+  <!-- Purple headband -->
+  <path d="M 84 70 Q 90 68 96 70" fill="none" stroke="rgb(220,180,255)" stroke-width="3" stroke-linecap="round" />
+  <path d="M 84 70 Q 90 68 96 70" fill="none" stroke="rgb(200,160,240)" stroke-width="2" stroke-linecap="round" opacity="0.6" />
+  
+  <!-- Closed eyes -->
+  <path d="M 86 78 Q 88 79 90 78" fill="none" stroke="rgba(100,70,50,0.7)" stroke-width="2" stroke-linecap="round" />
+  <path d="M 90 78 Q 92 79 94 78" fill="none" stroke="rgba(100,70,50,0.7)" stroke-width="2" stroke-linecap="round" />
+  
+  <!-- Rosy cheeks -->
+  <ellipse cx="82" cy="84" rx="2.5" ry="2" fill="rgba(255,180,180,0.7)" />
+  <ellipse cx="98" cy="84" rx="2.5" ry="2" fill="rgba(255,180,180,0.7)" />
+  
+  <!-- Small smile -->
+  <path d="M 85 86 Q 90 88 95 86" fill="none" stroke="rgba(150,100,80,0.4)" stroke-width="1.5" stroke-linecap="round" />
+  
+  <!-- Legs -->
+  <line x1="87" y1="150" x2="87" y2="165" stroke="rgba(255,230,200,0.95)" stroke-width="3.5" stroke-linecap="round" />
+  <line x1="93" y1="150" x2="93" y2="165" stroke="rgba(255,230,200,0.95)" stroke-width="3.5" stroke-linecap="round" />
+  
+  <!-- Feet -->
+  <ellipse cx="87" cy="168" rx="2.5" ry="3.5" fill="rgba(180,140,100,0.9)" />
+  <ellipse cx="93" cy="168" rx="2.5" ry="3.5" fill="rgba(180,140,100,0.9)" />
+</svg>
+
