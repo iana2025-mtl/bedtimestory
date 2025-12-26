@@ -26,6 +26,7 @@ interface StoryResponse {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+    const language: 'en' | 'fr' = body.language || 'en';
 
     // Validation
     if (!body.children || body.children.length === 0) {
@@ -76,8 +77,36 @@ export async function POST(request: NextRequest) {
       ...(body.customCharacters ? [body.customCharacters] : []),
     ];
 
-    // Build the system prompt (with placeholders that will be explained)
-    const systemPrompt = `You are a bedtime story generator. I will provide you with the exact names and ages of children, the theme of the story, the length, and preferred characters.
+    // Build the system prompt based on language
+    const systemPrompt = language === 'fr'
+      ? `Tu es un générateur d'histoires du soir. Je vais te fournir les noms et âges exacts des enfants, le thème de l'histoire, la longueur, et les personnages préférés.
+
+EXIGENCES CRITIQUES:
+- Tu DOIS utiliser les noms EXACTS fournis pour les enfants. Ne change PAS, ne modifie PAS, et ne substitue PAS ces noms par d'autres noms.
+- Utilise les noms des enfants de manière cohérente tout au long de l'histoire.
+- Si plusieurs enfants sont fournis, inclus-les tous dans l'histoire en utilisant leurs noms exacts.
+- Les âges des enfants doivent être reflétés dans le contenu de l'histoire et le niveau de langue.
+
+Format des variables:
+{{length}} sera le nombre de minutes que l'histoire devrait prendre à lire
+{{theme}} sera une chaîne décrivant le thème pédagogique (par exemple, "gentillesse", "courage")
+{{children}} sera un tableau d'objets, chacun contenant "name" (nom exact à utiliser) et "age"
+{{characters}} sera un tableau de types de personnages que les enfants apprécient
+
+Génère l'histoire dans la contrainte de temps. Divise l'histoire en sections avec des titres clairs.
+
+Format de sortie:
+Retourne UNIQUEMENT du JSON valide dans ce format exact (pas de texte supplémentaire, pas de markdown, juste le JSON):
+{
+  "title": "Titre de l'Histoire",
+  "sections": [
+    {
+      "headline": "Titre de Section",
+      "body": "Texte du corps de la section ici..."
+    }
+  ]
+}`
+      : `You are a bedtime story generator. I will provide you with the exact names and ages of children, the theme of the story, the length, and preferred characters.
 
 CRITICAL REQUIREMENTS:
 - You MUST use the EXACT names provided for the children. Do NOT change, modify, or substitute these names with any other names.
@@ -106,10 +135,32 @@ Return ONLY valid JSON in this exact format (no additional text, no markdown, ju
 }`;
 
     // Format children names for emphasis in prompt
-    const childrenNamesList = childrenData.map((c: { name: string; age: string }) => `${c.name} (age ${c.age})`).join(' and ');
+    const childrenNamesList = childrenData.map((c: { name: string; age: string }) => `${c.name} (${language === 'fr' ? 'âge' : 'age'} ${c.age})`).join(language === 'fr' ? ' et ' : ' and ');
     
     // User prompt with the actual values (replacing the placeholders)
-    const userPrompt = `Generate a bedtime story with the following details:
+    const userPrompt = language === 'fr'
+      ? `Génère une histoire du soir avec les détails suivants:
+
+ENFANTS (UTILISE CES NOMS EXACTS): ${childrenNamesList}
+Données des enfants: ${JSON.stringify(childrenData)}
+
+Thème: ${themeString}
+Longueur de l'histoire: ${lengthMinutes} minutes
+Personnages préférés: ${characters.length > 0 ? characters.join(', ') : 'n\'importe lesquels'}
+
+IMPORTANT: Utilise les noms exacts fournis ci-dessus (${childrenData.map((c: { name: string; age: string }) => c.name).join(', ')}) tout au long de l'histoire. N'utilise aucun autre nom.
+
+Retourne uniquement du JSON valide dans ce format exact (pas de texte supplémentaire, pas de markdown, uniquement le JSON):
+{
+  "title": "Titre de l'Histoire",
+  "sections": [
+    {
+      "headline": "Titre de Section",
+      "body": "Texte du corps de la section ici..."
+    }
+  ]
+}`
+      : `Generate a bedtime story with the following details:
 
 CHILDREN (USE THESE EXACT NAMES): ${childrenNamesList}
 Children data: ${JSON.stringify(childrenData)}

@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useLanguage } from './contexts/LanguageContext';
+import LanguageSwitcher from './components/LanguageSwitcher';
 
 interface Child {
   name: string;
@@ -10,6 +12,7 @@ interface Child {
 
 export default function Home() {
   const router = useRouter();
+  const { t, language } = useLanguage();
   const [children, setChildren] = useState<Child[]>([
     { name: '', age: '' },
     { name: '', age: '' },
@@ -27,9 +30,9 @@ export default function Home() {
   const [visualStyle, setVisualStyle] = useState<string[]>([]);
   const [customVisualStyle, setCustomVisualStyle] = useState('');
 
-  const characterOptions = ['Princesses', 'Superheroes', 'Animals', 'Dragons'];
-  const teachingThemeOptions = ['Kindness', 'Bravery', 'Friendship', 'Honesty'];
-  const visualStyleOptions = ['Cartoon', 'Realistic', 'Fantasy', 'Modern'];
+  const characterOptions = t.options.characters;
+  const teachingThemeOptions = t.options.themes;
+  const visualStyleOptions = t.options.visualStyles;
 
   const handleChildChange = (index: number, field: 'name' | 'age', value: string) => {
     const updated = [...children];
@@ -84,6 +87,7 @@ export default function Home() {
       visualStyle,
       customVisualStyle,
       photoBase64, // Include base64 photo for image generation
+      language, // Include selected language for story generation
     };
 
     // Store in sessionStorage for temporary storage (session-based)
@@ -99,9 +103,15 @@ export default function Home() {
     <div className="min-h-screen night-sky-bg relative">
       {/* Header */}
       <header className="text-[#ffd93d] py-6 px-4 shadow-xl border-b border-[#ffd93d]/20 relative z-10 overflow-hidden">
-        <div className="max-w-4xl mx-auto text-center relative z-10">
-          <h1 className="text-3xl md:text-4xl font-bold mb-2 text-[#ffd93d] drop-shadow-[0_0_8px_rgba(255,217,61,0.5)]" style={{ fontFamily: 'var(--font-playfair-sc)' }}>No More Night Time Fussies</h1>
-          <p className="text-lg md:text-xl font-bold text-[#fef9e7]" style={{ fontFamily: 'var(--font-playfair)' }}>Bedtime Story Generator</p>
+        <div className="max-w-4xl mx-auto relative z-10">
+          <div className="flex justify-between items-center mb-4">
+            <div className="flex-1"></div>
+            <LanguageSwitcher />
+          </div>
+          <div className="text-center">
+            <h1 className="text-3xl md:text-4xl font-bold mb-2 text-[#ffd93d] drop-shadow-[0_0_8px_rgba(255,217,61,0.5)]" style={{ fontFamily: 'var(--font-playfair-sc)' }}>{t.header.title}</h1>
+            <p className="text-lg md:text-xl font-bold text-[#fef9e7]" style={{ fontFamily: 'var(--font-playfair)' }}>{t.header.subtitle}</p>
+          </div>
         </div>
       </header>
 
@@ -109,38 +119,38 @@ export default function Home() {
         <form onSubmit={handleSubmit} className="space-y-8">
           {/* Welcome Section */}
           <section className="night-card rounded-2xl p-6">
-            <h2 className="text-2xl font-semibold text-[#ffd93d] mb-4">Welcome!</h2>
+            <h2 className="text-2xl font-semibold text-[#ffd93d] mb-4">{t.form.welcome}</h2>
             <p className="text-[#fef9e7]">
-              Create a personalized bedtime story for your children. Fill out the form below to get started.
+              {t.form.welcomeDescription}
             </p>
           </section>
 
           {/* Children Names and Ages */}
           <section className="night-card rounded-2xl p-6">
             <h2 className="text-xl font-semibold text-[#ffd93d] mb-4">
-              What Are Your Children&apos;s Names and Ages?
+              {t.form.childrenNamesAges}
             </h2>
             <div className="space-y-4">
               {children.map((child, index) => (
                 <div key={index} className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-semibold text-[#5a8fb8] mb-2">Name</label>
+                    <label className="block text-sm font-semibold text-[#5a8fb8] mb-2">{t.form.name}</label>
                     <input
                       type="text"
                       value={child.name}
                       onChange={(e) => handleChildChange(index, 'name', e.target.value)}
                       className="night-input w-full px-4 py-2 rounded-lg text-[#fef9e7]"
-                      placeholder="Child's name"
+                      placeholder={t.form.namePlaceholder}
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-[#5a8fb8] mb-2">Age</label>
+                    <label className="block text-sm font-semibold text-[#5a8fb8] mb-2">{t.form.age}</label>
                     <input
                       type="text"
                       value={child.age}
                       onChange={(e) => handleChildChange(index, 'age', e.target.value)}
                       className="night-input w-full px-4 py-2 rounded-lg text-[#fef9e7]"
-                      placeholder="Age"
+                      placeholder={t.form.agePlaceholder}
                     />
                   </div>
                 </div>
@@ -151,7 +161,7 @@ export default function Home() {
           {/* Characters/Themes They Enjoy */}
           <section className="night-card rounded-2xl p-6">
             <h2 className="text-xl font-semibold text-[#ffd93d] mb-4">
-              What kind of characters or themes do they enjoy?
+              {t.form.charactersQuestion}
             </h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
               {characterOptions.map((option) => (
@@ -174,14 +184,14 @@ export default function Home() {
               value={customCharacters}
               onChange={(e) => setCustomCharacters(e.target.value)}
               className="night-input w-full px-4 py-2 rounded-lg text-[#fef9e7]"
-              placeholder="Something Else"
+              placeholder={t.form.somethingElse}
             />
           </section>
 
           {/* Teaching Themes */}
           <section className="night-card rounded-2xl p-6">
             <h2 className="text-xl font-semibold text-[#ffd93d] mb-4">
-              What themes are you trying to teach?
+              {t.form.themesQuestion}
             </h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
               {teachingThemeOptions.map((option) => (
@@ -204,17 +214,17 @@ export default function Home() {
               value={customTeachingTheme}
               onChange={(e) => setCustomTeachingTheme(e.target.value)}
               className="night-input w-full px-4 py-2 rounded-lg text-[#fef9e7]"
-              placeholder="Something Else"
+              placeholder={t.form.somethingElse}
             />
           </section>
 
           {/* Story Length */}
           <section className="night-card rounded-2xl p-6">
             <h2 className="text-xl font-semibold text-[#ffd93d] mb-4">
-              How Long Do You Want the Story To Be?
+              {t.form.storyLengthQuestion}
             </h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {['3-5 Mins', '5-10 Mins', '10-15 Mins', '15-20 Mins'].map((length) => (
+              {t.options.storyLengths.map((length) => (
                 <button
                   key={length}
                   type="button"
@@ -234,7 +244,7 @@ export default function Home() {
           {/* Include Images */}
           <section className="night-card rounded-2xl p-6">
             <h2 className="text-xl font-semibold text-[#ffd93d] mb-4">
-              Would you like to include images?
+              {t.form.includeImagesQuestion}
             </h2>
             <div className="flex gap-4">
               <button
@@ -246,7 +256,7 @@ export default function Home() {
                     : 'bg-[rgba(30,58,95,0.3)] text-[#fef9e7] border-[rgba(30,58,95,0.6)] hover:border-[rgba(30,58,95,0.8)] hover:bg-[rgba(30,58,95,0.4)]'
                 }`}
               >
-                Yes
+                {t.form.yes}
               </button>
               <button
                 type="button"
@@ -257,7 +267,7 @@ export default function Home() {
                     : 'bg-[rgba(30,58,95,0.3)] text-[#fef9e7] border-[rgba(30,58,95,0.6)] hover:border-[rgba(30,58,95,0.8)] hover:bg-[rgba(30,58,95,0.4)]'
                 }`}
               >
-                No
+                {t.form.no}
               </button>
             </div>
           </section>
@@ -265,7 +275,7 @@ export default function Home() {
           {/* Photo Upload */}
           <section className="night-card rounded-2xl p-6">
             <h2 className="text-xl font-semibold text-[#ffd93d] mb-4">
-              Please Upload a Photo of Your Children
+              {t.form.photoUpload}
             </h2>
             <div className="border-2 border-dashed border-[rgba(30,58,95,0.6)] rounded-xl p-8 text-center hover:border-[rgba(30,58,95,0.8)] transition-colors">
               <input
@@ -286,13 +296,13 @@ export default function Home() {
                       alt="Uploaded photo"
                       className="max-w-full max-h-64 mx-auto rounded-lg object-contain shadow-xl"
                     />
-                    <p className="text-sm text-[#fef9e7]">Click to change photo</p>
+                    <p className="text-sm text-[#fef9e7]">{t.form.clickToChangePhoto}</p>
                   </div>
                 ) : (
                   <div className="space-y-2">
                     <div className="text-4xl">🌙</div>
-                    <p className="text-[#fef9e7]">Click to upload photo</p>
-                    <p className="text-sm text-[#fef9e7]/60">PNG, JPG, GIF up to 10MB</p>
+                    <p className="text-[#fef9e7]">{t.form.clickToUpload}</p>
+                    <p className="text-sm text-[#fef9e7]/60">{t.form.fileTypes}</p>
                   </div>
                 )}
               </label>
@@ -302,20 +312,20 @@ export default function Home() {
           {/* Photo Description */}
           <section className="night-card rounded-2xl p-6">
             <h2 className="text-xl font-semibold text-[#ffd93d] mb-4">
-              Describe Which Child is Which in the Photo
+              {t.form.photoDescription}
             </h2>
             <textarea
               value={photoDescription}
               onChange={(e) => setPhotoDescription(e.target.value)}
               className="night-input w-full px-4 py-3 rounded-lg text-[#fef9e7] min-h-[120px]"
-              placeholder="Describe which child is which in the photo..."
+              placeholder={t.form.photoDescription}
             />
           </section>
 
           {/* Visual Style */}
           <section className="night-card rounded-2xl p-6">
             <h2 className="text-xl font-semibold text-[#ffd93d] mb-4">
-              What Visual Style Might Your Child Like?
+              {t.form.visualStyleQuestion}
             </h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
               {visualStyleOptions.map((option) => (
@@ -338,7 +348,7 @@ export default function Home() {
               value={customVisualStyle}
               onChange={(e) => setCustomVisualStyle(e.target.value)}
               className="night-input w-full px-4 py-2 rounded-lg text-[#fef9e7]"
-              placeholder="Something Else"
+              placeholder={t.form.somethingElse}
             />
           </section>
 
@@ -348,7 +358,7 @@ export default function Home() {
               type="submit"
               className="px-12 py-4 bg-gradient-to-r from-[#ffd93d] to-[#ff8c42] text-[#1a0d2e] text-xl font-bold rounded-xl shadow-lg shadow-[#ffd93d]/50 hover:shadow-xl hover:shadow-[#ffd93d]/70 transform hover:scale-105 transition-all duration-200"
             >
-              Generate Story ✨
+              {t.form.generateStory}
             </button>
           </div>
         </form>

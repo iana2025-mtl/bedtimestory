@@ -2,6 +2,8 @@
 
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
+import { useLanguage } from '../contexts/LanguageContext';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 
 interface FormData {
   children: Array<{ name: string; age: string }>;
@@ -15,6 +17,7 @@ interface FormData {
   visualStyle: string[];
   customVisualStyle: string;
   photoBase64: string | null;
+  language?: 'en' | 'fr';
 }
 
 interface StoryData {
@@ -27,6 +30,7 @@ interface StoryData {
 
 export default function StoryPage() {
   const router = useRouter();
+  const { t, language } = useLanguage();
   const [formData, setFormData] = useState<FormData | null>(null);
   const [story, setStory] = useState<StoryData | null>(null);
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
@@ -71,6 +75,7 @@ export default function StoryPage() {
           photoDescription: data.photoDescription,
           visualStyle: data.visualStyle,
           customVisualStyle: data.customVisualStyle,
+          language: data.language || language, // Use stored language or current language
         }),
       });
 
@@ -179,17 +184,23 @@ export default function StoryPage() {
     <div className="min-h-screen night-sky-bg relative">
       {/* Header */}
       <header className="text-[#ffd93d] py-6 px-4 shadow-xl border-b border-[#ffd93d]/20 relative z-10 overflow-hidden">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <div className="text-center flex-1 relative z-10">
-            <h1 className="text-3xl md:text-4xl font-bold mb-2 text-[#ffd93d] drop-shadow-[0_0_8px_rgba(255,217,61,0.5)]" style={{ fontFamily: 'var(--font-playfair-sc)' }}>No More Night Time Fussies</h1>
-            <p className="text-lg md:text-xl font-bold text-[#fef9e7]" style={{ fontFamily: 'var(--font-playfair)' }}>Bedtime Story Generator</p>
+        <div className="max-w-4xl mx-auto relative z-10">
+          <div className="flex justify-between items-center mb-4">
+            <div className="flex-1"></div>
+            <LanguageSwitcher />
           </div>
-          <button
-            onClick={handleNewStory}
-            className="px-4 py-2 bg-[#ffd93d]/20 hover:bg-[#ffd93d]/30 text-[#ffd93d] border border-[#ffd93d]/40 rounded-lg transition-colors text-sm font-medium"
-          >
-            New Story
-          </button>
+          <div className="flex items-center justify-between">
+            <div className="text-center flex-1">
+              <h1 className="text-3xl md:text-4xl font-bold mb-2 text-[#ffd93d] drop-shadow-[0_0_8px_rgba(255,217,61,0.5)]" style={{ fontFamily: 'var(--font-playfair-sc)' }}>{t.header.title}</h1>
+              <p className="text-lg md:text-xl font-bold text-[#fef9e7]" style={{ fontFamily: 'var(--font-playfair)' }}>{t.header.subtitle}</p>
+            </div>
+            <button
+              onClick={handleNewStory}
+              className="px-4 py-2 bg-[#ffd93d]/20 hover:bg-[#ffd93d]/30 text-[#ffd93d] border border-[#ffd93d]/40 rounded-lg transition-colors text-sm font-medium"
+            >
+              {t.story.newStory}
+            </button>
+          </div>
         </div>
       </header>
 
@@ -203,12 +214,12 @@ export default function StoryPage() {
 
         {/* Story Cover / Generated Image */}
         <section className="night-card rounded-2xl p-6 mb-6">
-          <h2 className="text-xl font-semibold text-[#ffd93d] mb-4">Story Cover</h2>
+          <h2 className="text-xl font-semibold text-[#ffd93d] mb-4">{t.story.storyCover}</h2>
           {isGeneratingImage ? (
             <div className="w-full h-64 rounded-xl flex items-center justify-center border-2 border-dashed border-[rgba(30,58,95,0.6)]">
               <div className="text-center text-[#fef9e7]">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#ffd93d] mx-auto mb-4"></div>
-                <p className="text-lg font-medium">Generating stylized image...</p>
+                <p className="text-lg font-medium">{t.story.generatingImage}</p>
               </div>
             </div>
           ) : generatedImageUrl ? (
@@ -227,9 +238,9 @@ export default function StoryPage() {
             <div className="w-full h-64 rounded-xl flex items-center justify-center border-2 border-dashed border-[rgba(30,58,95,0.6)]">
               <div className="text-center text-[#fef9e7]">
                 <div className="text-6xl mb-2">🌙</div>
-                <p className="text-lg font-medium">Story cover will appear here</p>
+                <p className="text-lg font-medium">{t.story.coverPlaceholder}</p>
                 {formData && !formData.includeImages && (
-                  <p className="text-sm text-[#fef9e7]/60 mt-2">Images were not requested</p>
+                  <p className="text-sm text-[#fef9e7]/60 mt-2">{t.story.imagesNotRequested}</p>
                 )}
               </div>
             </div>
@@ -238,14 +249,14 @@ export default function StoryPage() {
 
         {/* Story Text */}
         <section className="night-card rounded-2xl p-6">
-          <h2 className="text-xl font-semibold text-[#ffd93d] mb-4">Story Text</h2>
+          <h2 className="text-xl font-semibold text-[#ffd93d] mb-4">{t.story.storyText}</h2>
           {isGeneratingStory ? (
             <div className="w-full min-h-96 rounded-xl p-8 border-2 border-dashed border-[rgba(30,58,95,0.6)] flex items-center justify-center">
               <div className="text-center text-[#fef9e7] space-y-4">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#ffd93d] mx-auto"></div>
-                <p className="text-lg font-medium">Generating your personalized story...</p>
+                <p className="text-lg font-medium">{t.story.generatingStory}</p>
                 <p className="text-sm text-[#fef9e7]/70">
-                  This may take a few moments
+                  {t.story.mayTakeMoment}
                 </p>
               </div>
             </div>
@@ -272,21 +283,12 @@ export default function StoryPage() {
                 ))}
               </div>
 
-              {/* JSON Display Toggle */}
-              <details className="mt-8 pt-6 border-t border-[rgba(30,58,95,0.6)]">
-                <summary className="cursor-pointer text-sm font-medium text-[#ffd93d] hover:text-[#ffd93d]/80">
-                  View JSON Structure
-                </summary>
-                <pre className="mt-4 p-4 bg-[rgba(30,58,95,0.4)] text-[#fef9e7] rounded-lg overflow-x-auto text-xs border border-[rgba(30,58,95,0.6)]">
-                  {JSON.stringify(story, null, 2)}
-                </pre>
-              </details>
             </div>
           ) : (
             <div className="w-full min-h-96 rounded-xl p-8 border-2 border-dashed border-[rgba(30,58,95,0.6)]">
               <div className="text-center text-[#fef9e7] space-y-4">
                 <div className="text-6xl mb-4">✨</div>
-                <p className="text-lg font-medium">Your personalized story will be generated here</p>
+                <p className="text-lg font-medium">{t.story.storyPlaceholder}</p>
               </div>
             </div>
           )}
@@ -299,10 +301,10 @@ export default function StoryPage() {
               <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#ffd93d]"></div>
               <span className="text-[#fef9e7] font-medium">
                 {isGeneratingStory
-                  ? 'Generating your story...'
+                  ? t.story.generatingStory
                   : isGeneratingImage
-                  ? 'Creating stylized image...'
-                  : 'Processing...'}
+                  ? t.story.generatingImage
+                  : t.story.generatingStory}
               </span>
             </div>
           </div>
