@@ -214,7 +214,6 @@ export default function StoryPage() {
 
         {/* Story Cover / Generated Image */}
         <section className="night-card rounded-2xl p-6 mb-6">
-          <h2 className="text-xl font-semibold text-[#ffd93d] mb-4">{t.story.storyCover}</h2>
           {isGeneratingImage ? (
             <div className="w-full h-64 rounded-xl flex items-center justify-center border-2 border-dashed border-[rgba(30,58,95,0.6)]">
               <div className="text-center text-[#fef9e7]">
@@ -249,7 +248,6 @@ export default function StoryPage() {
 
         {/* Story Text */}
         <section className="night-card rounded-2xl p-6">
-          <h2 className="text-xl font-semibold text-[#ffd93d] mb-4">{t.story.storyText}</h2>
           {isGeneratingStory ? (
             <div className="w-full min-h-96 rounded-xl p-8 border-2 border-dashed border-[rgba(30,58,95,0.6)] flex items-center justify-center">
               <div className="text-center text-[#fef9e7] space-y-4">
@@ -263,7 +261,7 @@ export default function StoryPage() {
           ) : story ? (
             <div className="w-full rounded-xl p-8 border-2 border-[rgba(30,58,95,0.6)]">
               {/* Story Title */}
-              <h1 className="text-3xl md:text-4xl font-bold text-[#ffd93d] mb-8 text-center drop-shadow-[0_0_8px_rgba(255,217,61,0.3)]">
+              <h1 className="text-3xl md:text-4xl font-bold text-[#ffd93d] mb-8 text-center drop-shadow-[0_0_8px_rgba(255,217,61,0.3)]" style={{ fontFamily: 'var(--font-playfair-sc)' }}>
                 {story.title}
               </h1>
               
