@@ -77,27 +77,50 @@ export async function POST(request: NextRequest) {
     ];
 
     // Build the system prompt (with placeholders that will be explained)
-    const systemPrompt = `Play the role of story generator. A bedtime story generator. I'll provide you with ages and names of the {{children}}, the {{theme}} of the story, the {{length}} of the story, and {{characters}}. Generate the story within the constraints. You should incorporate headers to divide the sections of the story 
+    const systemPrompt = `You are a bedtime story generator. I will provide you with the exact names and ages of children, the theme of the story, the length, and preferred characters.
+
+CRITICAL REQUIREMENTS:
+- You MUST use the EXACT names provided for the children. Do NOT change, modify, or substitute these names with any other names.
+- Use the children's names consistently throughout the entire story.
+- If multiple children are provided, include all of them in the story using their exact names.
+- The children's ages should be reflected in the story content and language level.
 
 Variable format:
-{{length}} will be the number of minutes
-{{theme}} will be a string
-{{children}} will come in a form of object containing their name and age
-{{characters}} will come in a form of an array 
+{{length}} will be the number of minutes the story should take to read
+{{theme}} will be a string describing the teaching theme (e.g., "kindness", "bravery")
+{{children}} will be an array of objects, each containing "name" (exact name to use) and "age"
+{{characters}} will be an array of character types the children enjoy
 
-I do not want you to add any additional commentary before or at the end; just provide me with the story
+Generate the story within the time constraint. Divide the story into sections with clear headlines.
+
 Output format:
-Just supply me with a json containing a title and an array of objects containing headlines and body contents for each section`;
+Return ONLY valid JSON in this exact format (no additional text, no markdown, just the JSON):
+{
+  "title": "Story Title",
+  "sections": [
+    {
+      "headline": "Section Headline",
+      "body": "Section body text here..."
+    }
+  ]
+}`;
 
+    // Format children names for emphasis in prompt
+    const childrenNamesList = childrenData.map((c: { name: string; age: string }) => `${c.name} (age ${c.age})`).join(' and ');
+    
     // User prompt with the actual values (replacing the placeholders)
     const userPrompt = `Generate a bedtime story with the following details:
 
-{{children}} = ${JSON.stringify(childrenData)}
-{{theme}} = ${themeString}
-{{length}} = ${lengthMinutes}
-{{characters}} = ${JSON.stringify(characters)}
+CHILDREN (USE THESE EXACT NAMES): ${childrenNamesList}
+Children data: ${JSON.stringify(childrenData)}
 
-Return only valid JSON in this exact format (no additional text, only the JSON):
+Theme: ${themeString}
+Story length: ${lengthMinutes} minutes
+Preferred characters: ${characters.length > 0 ? characters.join(', ') : 'any'}
+
+IMPORTANT: Use the exact names provided above (${childrenData.map((c: { name: string; age: string }) => c.name).join(', ')}) throughout the story. Do not use any other names.
+
+Return only valid JSON in this exact format (no additional text, no markdown, only the JSON):
 {
   "title": "Story Title",
   "sections": [
