@@ -1,9 +1,10 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import LanguageSwitcher from '../components/LanguageSwitcher';
+import { processUploadedPhoto, getStyleFilterCSS } from '../lib/imageProcessing';
 
 interface FormData {
   children: Array<{ name: string; age: string }>;
@@ -34,11 +35,24 @@ export default function StoryPage() {
   const [formData, setFormData] = useState<FormData | null>(null);
   const [story, setStory] = useState<StoryData | null>(null);
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
+  const [isUploadedPhoto, setIsUploadedPhoto] = useState(false); // Track if image is from uploaded photo
+  const [currentVisualStyle, setCurrentVisualStyle] = useState<string[]>([]); // Store visual style for CSS filters
   const [isGeneratingStory, setIsGeneratingStory] = useState(true);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Critical: Lock mechanism to prevent duplicate generation and auto-regeneration
+  const imageLockedRef = useRef<boolean>(false); // Lock flag - once true, image is final
+  const generationRequestIdRef = useRef<number>(0); // Track current generation request to ignore late responses
+  const imageGenerationStartedRef = useRef<boolean>(false); // Track if generation has started
+  const initializationCompleteRef = useRef<boolean>(false); // Track if initialization has completed
 
   useEffect(() => {
+    // CRITICAL: Only initialize once - prevent re-runs on re-renders, language changes, etc.
+    if (initializationCompleteRef.current) {
+      return; // Already initialized - do nothing
+    }
+
     // Load form data from sessionStorage
     const storedData = sessionStorage.getItem('storyFormData');
     if (!storedData) {
@@ -50,9 +64,38 @@ export default function StoryPage() {
     const data = JSON.parse(storedData) as FormData;
     setFormData(data);
 
-    // Generate story first
-    generateStory(data);
-  }, [router]);
+    // Check if story cover image is already persisted and locked
+    const storedImageData = sessionStorage.getItem('storyCoverImage');
+    if (storedImageData) {
+      try {
+        const imageData = JSON.parse(storedImageData);
+        if (imageData.imageUrl) {
+          // Image exists - restore it and lock it (no regeneration)
+          setGeneratedImageUrl(imageData.imageUrl);
+          setIsUploadedPhoto(imageData.isUploadedPhoto || false);
+          setCurrentVisualStyle(imageData.visualStyle || []);
+          imageLockedRef.current = true; // Lock the image - it's final
+          imageGenerationStartedRef.current = true; // Mark as already generated
+          initializationCompleteRef.current = true; // Mark initialization as complete
+          console.log('Restored and locked persisted story cover image');
+          return; // Exit early - image is locked, no generation needed
+        }
+      } catch (err) {
+        console.warn('Failed to parse stored image data:', err);
+        sessionStorage.removeItem('storyCoverImage');
+      }
+    }
+
+    // CRITICAL: Only generate story if image is not locked
+    // This prevents regeneration on re-renders, language changes, or state updates
+    if (!imageLockedRef.current) {
+      // Generate story first
+      generateStory(data);
+    }
+    
+    // Mark initialization as complete
+    initializationCompleteRef.current = true;
+  }, [router]); // Include router for navigation, but use ref to prevent duplicate runs
 
   const generateStory = async (data: FormData) => {
     try {
@@ -101,19 +144,32 @@ export default function StoryPage() {
       
       setIsGeneratingStory(false);
 
-      // After story is generated, generate image if conditions are met
+      // After story is generated, handle story cover image
+      // CRITICAL: Only generate ONCE if image is not locked and generation hasn't started
       if (
-        data.includeImages === true &&
-        data.visualStyle.length > 0
+        data.includeImages === true && 
+        data.visualStyle.length > 0 &&
+        !imageLockedRef.current &&
+        !imageGenerationStartedRef.current
       ) {
-        // Generate image even if no photo is uploaded (will use description/names)
-        generateImage(
-          data.photoBase64 || null,
-          data.visualStyle,
-          data.customVisualStyle,
-          data.photoDescription,
-          data.children
-        );
+        // Mark generation as started to prevent duplicate calls
+        imageGenerationStartedRef.current = true;
+        
+        if (data.photoBase64) {
+          // CASE B: Photo uploaded - process the uploaded photo
+          processUploadedPhotoImage(
+            data.photoBase64,
+            data.visualStyle
+          );
+        } else {
+          // CASE A: No photo uploaded - generate AI image
+          generateAIImage(
+            data.visualStyle,
+            data.customVisualStyle,
+            data.photoDescription,
+            data.children
+          );
+        }
       }
     } catch (err) {
       console.error('Error generating story:', err);
@@ -122,13 +178,25 @@ export default function StoryPage() {
     }
   };
 
-  const generateImage = async (
-    photoBase64: string | null,
+  /**
+   * CASE A: Generate AI image when no photo is uploaded
+   * CRITICAL: Only generates once, locks image after generation, ignores late responses
+   */
+  const generateAIImage = async (
     visualStyle: string[],
     customVisualStyle: string,
     photoDescription: string,
     children: Array<{ name: string; age: string }>
   ) => {
+    // CRITICAL: Check if image is already locked - if so, do nothing
+    if (imageLockedRef.current) {
+      console.log('Image is locked - skipping generation');
+      return;
+    }
+
+    // Generate unique request ID to track this specific generation request
+    const requestId = ++generationRequestIdRef.current;
+    
     try {
       setIsGeneratingImage(true);
       setError(null);
@@ -141,7 +209,6 @@ export default function StoryPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          imageBase64: photoBase64,
           visualStyle,
           photoDescription: photoDescription,
           children: children,
@@ -151,32 +218,230 @@ export default function StoryPage() {
 
       const result = await response.json();
 
+      // CRITICAL: Check if this response is still valid (not a late/duplicate response)
+      if (requestId !== generationRequestIdRef.current) {
+        console.log('Ignoring late/duplicate image generation response');
+        return;
+      }
+
+      // CRITICAL: Double-check lock before setting image
+      if (imageLockedRef.current) {
+        console.log('Image was locked during generation - ignoring response');
+        return;
+      }
+
       if (!response.ok) {
-        // Extract error message from API response
         const errorMessage = result.error || result.details || 'Failed to generate image';
         throw new Error(errorMessage);
       }
       
-      // Set the generated image URL
+      let finalImageUrl: string | null = null;
       if (result.imageUrl) {
-        setGeneratedImageUrl(result.imageUrl);
+        finalImageUrl = result.imageUrl;
       } else if (result.imageBase64) {
-        setGeneratedImageUrl(`data:image/png;base64,${result.imageBase64}`);
+        finalImageUrl = `data:image/png;base64,${result.imageBase64}`;
       } else {
         throw new Error('No image URL or base64 data received from API');
       }
       
+      // CRITICAL: Final check before setting and locking
+      if (imageLockedRef.current || requestId !== generationRequestIdRef.current) {
+        console.log('Image locked or request outdated - ignoring response');
+        return;
+      }
+      
+      // Mark as AI-generated (not uploaded photo)
+      setIsUploadedPhoto(false);
+      setGeneratedImageUrl(finalImageUrl);
+      setCurrentVisualStyle(visualStyle);
+      
+      // CRITICAL: Lock the image immediately after setting it
+      imageLockedRef.current = true;
+      
+      // Persist the generated image
+      if (finalImageUrl) {
+        persistStoryCoverImage(finalImageUrl, false, visualStyle);
+      }
+      
       setIsGeneratingImage(false);
     } catch (err) {
-      console.error('Error generating image:', err);
-      setError(err instanceof Error ? err.message : 'Failed to generate image');
+      // CRITICAL: Only handle error if this is still the current request
+      if (requestId === generationRequestIdRef.current && !imageLockedRef.current) {
+        console.error('Error generating AI image:', err);
+        setError(err instanceof Error ? err.message : 'Failed to generate image');
+        setIsGeneratingImage(false);
+        // Reset generation flag on error so user can retry by starting new story
+        imageGenerationStartedRef.current = false;
+      }
+    }
+  };
+
+  /**
+   * CASE B: Process uploaded photo with smart cropping and AI enhancement
+   * Flow: Smart Crop -> AI Enhancement (with fallback) -> Display
+   * CRITICAL: Only processes once, locks image after generation, ignores late responses
+   */
+  const processUploadedPhotoImage = async (
+    photoBase64: string,
+    visualStyle: string[]
+  ) => {
+    // CRITICAL: Check if image is already locked - if so, do nothing
+    if (imageLockedRef.current) {
+      console.log('Image is locked - skipping processing');
+      return;
+    }
+
+    // Generate unique request ID to track this specific generation request
+    const requestId = ++generationRequestIdRef.current;
+    
+    try {
+      setIsGeneratingImage(true);
+      setError(null);
+      setCurrentVisualStyle(visualStyle);
+
+      // Step 1: Smart cropping (prioritizes faces, upper portion, avoids cutting heads)
+      const croppedImage = await processUploadedPhoto(photoBase64, {
+        visualStyle,
+        width: 1024,
+        height: 640,
+      });
+
+      // CRITICAL: Check if request is still valid before continuing
+      if (requestId !== generationRequestIdRef.current || imageLockedRef.current) {
+        console.log('Request outdated or image locked - stopping processing');
+        return;
+      }
+
+      // Step 2: Try AI enhancement (with graceful fallback)
+      let finalImage = croppedImage;
+      try {
+        const enhancedImage = await enhanceImageWithAI(
+          croppedImage,
+          visualStyle,
+          formData?.children || []
+        );
+        
+        // CRITICAL: Check again before using enhanced image
+        if (requestId !== generationRequestIdRef.current || imageLockedRef.current) {
+          console.log('Request outdated or image locked - using cropped image only');
+          finalImage = croppedImage;
+        } else if (enhancedImage) {
+          // AI enhancement succeeded
+          finalImage = enhancedImage;
+        }
+        // If enhancement not available, use cropped image with CSS filters
+      } catch (enhanceError) {
+        // AI enhancement failed, gracefully fall back to cropped image
+        console.warn('AI enhancement failed, using cropped image:', enhanceError);
+      }
+
+      // CRITICAL: Final check before setting and locking
+      if (imageLockedRef.current || requestId !== generationRequestIdRef.current) {
+        console.log('Image locked or request outdated - ignoring processed image');
+        return;
+      }
+
+      // Mark as uploaded photo (will apply CSS filters)
+      setIsUploadedPhoto(true);
+      setGeneratedImageUrl(finalImage);
+      
+      // CRITICAL: Lock the image immediately after setting it
+      imageLockedRef.current = true;
+      
+      // Persist the processed image
+      persistStoryCoverImage(finalImage, true, visualStyle);
+      
       setIsGeneratingImage(false);
+    } catch (err) {
+      // CRITICAL: Only handle error if this is still the current request
+      if (requestId === generationRequestIdRef.current && !imageLockedRef.current) {
+        console.error('Error processing uploaded photo:', err);
+        setError(err instanceof Error ? err.message : 'Failed to process photo');
+        setIsGeneratingImage(false);
+        // Reset generation flag on error so user can retry by starting new story
+        imageGenerationStartedRef.current = false;
+      }
+    }
+  };
+
+  /**
+   * AI Enhancement: Apply subtle AI enhancement to cropped photo
+   * Returns enhanced image URL or null if enhancement not available (fallback)
+   */
+  const enhanceImageWithAI = async (
+    croppedImageBase64: string,
+    visualStyle: string[],
+    children: Array<{ name: string; age: string }>
+  ): Promise<string | null> => {
+    try {
+      // Extract base64 data (remove data URL prefix if present)
+      let base64Data = croppedImageBase64;
+      if (croppedImageBase64.startsWith('data:')) {
+        base64Data = croppedImageBase64.split(',')[1];
+      }
+
+      const response = await fetch('/api/enhance-image', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          imageBase64: base64Data,
+          visualStyle,
+          children,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        // Enhancement not available or failed - return null for fallback
+        return null;
+      }
+
+      // If AI enhancement returns an image URL, use it
+      if (result.imageUrl) {
+        return result.imageUrl;
+      }
+
+      // If enhancement indicates to use client-side filters, return null
+      // (we'll use CSS filters as fallback)
+      return null;
+    } catch (err) {
+      console.warn('AI enhancement error:', err);
+      return null; // Graceful fallback
+    }
+  };
+
+  /**
+   * Persist story cover image to sessionStorage
+   */
+  const persistStoryCoverImage = (
+    imageUrl: string,
+    isUploadedPhoto: boolean,
+    visualStyle: string[]
+  ) => {
+    try {
+      const imageData = {
+        imageUrl,
+        isUploadedPhoto,
+        visualStyle,
+        timestamp: Date.now(),
+      };
+      sessionStorage.setItem('storyCoverImage', JSON.stringify(imageData));
+      console.log('Story cover image persisted');
+    } catch (err) {
+      console.warn('Failed to persist story cover image:', err);
     }
   };
 
   const handleNewStory = () => {
-    // Clear session storage
+    // Clear session storage and reset all locks
     sessionStorage.removeItem('storyFormData');
+    sessionStorage.removeItem('storyCoverImage');
+    imageLockedRef.current = false;
+    imageGenerationStartedRef.current = false;
+    generationRequestIdRef.current = 0;
     router.push('/');
   };
 
@@ -222,14 +487,30 @@ export default function StoryPage() {
               </div>
             </div>
           ) : generatedImageUrl ? (
-            <div className="w-full rounded-xl overflow-hidden border-2 border-[rgba(30,58,95,0.6)]">
+            <div className="w-full rounded-xl overflow-hidden border-2 border-[rgba(30,58,95,0.6)] relative">
+              {/* Glow effect wrapper for uploaded photos */}
+              {isUploadedPhoto && currentVisualStyle.length > 0 && (
+                <div 
+                  className="absolute inset-0 rounded-xl pointer-events-none"
+                  style={{
+                    boxShadow: '0 0 40px rgba(255, 217, 61, 0.2), 0 0 80px rgba(255, 217, 61, 0.1), inset 0 0 60px rgba(255, 217, 61, 0.05)',
+                    zIndex: 1,
+                  }}
+                />
+              )}
               <img
                 src={generatedImageUrl}
-                alt="Generated story cover"
-                className="w-full h-auto object-contain max-h-96 mx-auto"
+                alt="Story cover"
+                className="w-full h-auto object-contain max-h-96 mx-auto rounded-xl relative z-10"
+                style={isUploadedPhoto && currentVisualStyle.length > 0 ? {
+                  filter: getStyleFilterCSS(currentVisualStyle),
+                  borderRadius: '12px',
+                } : {
+                  borderRadius: '12px',
+                }}
                 onError={(e) => {
-                  console.error('Failed to load generated image:', generatedImageUrl);
-                  setError('Failed to load generated image. Please try again.');
+                  console.error('Failed to load story cover image:', generatedImageUrl);
+                  setError('Failed to load story cover image. Please try again.');
                 }}
               />
             </div>

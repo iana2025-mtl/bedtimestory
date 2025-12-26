@@ -28,7 +28,7 @@ const openai = process.env.OPENAI_API_KEY
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { imageBase64, visualStyle, prompt, photoDescription, children } = body;
+    const { visualStyle, prompt, photoDescription, children } = body;
 
     // Validation
     if (!visualStyle || visualStyle.length === 0) {
@@ -37,6 +37,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // CASE A: This API only handles AI image generation (no photo uploaded)
+    // If imageBase64 is provided, it means a photo was uploaded, which should be handled client-side
 
     // Check for API key and OpenAI client
     if (!process.env.OPENAI_API_KEY || !openai) {

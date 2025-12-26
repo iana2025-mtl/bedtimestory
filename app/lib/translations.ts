@@ -28,17 +28,18 @@ export interface Translations {
     clickToChangePhoto: string;
     fileTypes: string;
   };
-  story: {
-    newStory: string;
-    storyCover: string;
-    storyText: string;
-    generatingStory: string;
-    generatingImage: string;
-    coverPlaceholder: string;
-    imagesNotRequested: string;
-    storyPlaceholder: string;
-    mayTakeMoment: string;
-  };
+    story: {
+      newStory: string;
+      storyCover: string;
+      storyText: string;
+      generatingStory: string;
+      generatingImage: string;
+      coverPlaceholder: string;
+      imagesNotRequested: string;
+      storyPlaceholder: string;
+      mayTakeMoment: string;
+      regenerateImage: string;
+    };
   options: {
     characters: string[];
     themes: string[];
@@ -86,6 +87,7 @@ export const translations: Record<Language, Translations> = {
       imagesNotRequested: 'Images were not requested',
       storyPlaceholder: 'Your personalized story will be generated here',
       mayTakeMoment: 'This may take a few moments',
+      regenerateImage: 'Regenerate',
     },
     options: {
       characters: ['Princesses', 'Superheroes', 'Animals', 'Dragons'],
@@ -132,6 +134,7 @@ export const translations: Record<Language, Translations> = {
       imagesNotRequested: 'Les images n\'ont pas été demandées',
       storyPlaceholder: 'Votre histoire personnalisée sera générée ici',
       mayTakeMoment: 'Cela peut prendre quelques instants',
+      regenerateImage: 'Régénérer',
     },
     options: {
       characters: ['Princesses', 'Super-héros', 'Animaux', 'Dragons'],
