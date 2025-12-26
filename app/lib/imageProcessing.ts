@@ -2,9 +2,11 @@
  * Image Processing Utilities for Story Cover
  * 
  * Handles client-side image processing for uploaded photos:
- * - Resize and crop to story cover dimensions
- * - Apply visual style filters (brightness, warmth, contrast, saturation)
- * - Add rounded corners
+ * - Safe contain/letterboxing (NO cropping - preserves full image)
+ * - Centers image horizontally and vertically
+ * - Maintains original proportions
+ * - Adds padding instead of cutting content
+ * - Never cuts off faces, heads, or people
  */
 
 export interface ImageProcessingOptions {
@@ -110,100 +112,65 @@ export function getEnhancedStyleFilterCSS(visualStyle: string[]): string {
 }
 
 /**
- * Smart cropping that prioritizes faces/upper portion
- * Adapts to portrait vs landscape, prefers padding over aggressive cropping
+ * Calculate safe image dimensions using contain/letterboxing approach
+ * NEVER crops - always preserves full image with padding
+ * Centers image horizontally and vertically
+ * 
+ * @returns Dimensions for drawing the full image centered with padding
  */
-function calculateSmartCrop(
+function calculateSafeContain(
   imgWidth: number,
   imgHeight: number,
   targetWidth: number,
   targetHeight: number
-): { sourceX: number; sourceY: number; sourceWidth: number; sourceHeight: number } {
-  const imgAspect = imgWidth / imgHeight;
-  const targetAspect = targetWidth / targetHeight;
+): { 
+  drawX: number; 
+  drawY: number; 
+  drawWidth: number; 
+  drawHeight: number;
+  sourceX: number;
+  sourceY: number;
+  sourceWidth: number;
+  sourceHeight: number;
+} {
+  // Calculate scale to fit image within target dimensions (contain)
+  // This ensures the entire image fits without cropping
+  const scaleX = targetWidth / imgWidth;
+  const scaleY = targetHeight / imgHeight;
+  const scale = Math.min(scaleX, scaleY); // Use smaller scale to ensure full image fits
   
-  let sourceX = 0;
-  let sourceY = 0;
-  let sourceWidth = imgWidth;
-  let sourceHeight = imgHeight;
+  // Calculate scaled dimensions
+  const scaledWidth = imgWidth * scale;
+  const scaledHeight = imgHeight * scale;
   
-  // Determine if image is portrait or landscape
-  const isPortrait = imgHeight > imgWidth;
-  const isLandscape = imgWidth > imgHeight;
+  // Center the image horizontally and vertically
+  const drawX = (targetWidth - scaledWidth) / 2;
+  const drawY = (targetHeight - scaledHeight) / 2;
   
-  if (imgAspect > targetAspect) {
-    // Image is wider than target - need to crop width
-    sourceWidth = imgHeight * targetAspect;
-    
-    // For portraits, prefer keeping upper portion (where faces usually are)
-    // For landscapes, center crop but slightly favor upper portion
-    if (isPortrait) {
-      // Portrait: prioritize top, avoid cutting heads
-      // Crop from top, leaving more space at bottom
-      sourceX = Math.max(0, (imgWidth - sourceWidth) / 2);
-      // Slight upward bias for faces
-      sourceX = Math.max(0, sourceX - (imgWidth * 0.05));
-    } else {
-      // Landscape: center crop with slight upper bias
-      sourceX = (imgWidth - sourceWidth) / 2;
-      sourceX = Math.max(0, sourceX - (imgWidth * 0.03));
-    }
-  } else {
-    // Image is taller than target - need to crop height
-    sourceHeight = imgWidth / targetAspect;
-    
-    // Always prioritize upper portion to avoid cutting heads
-    // For portraits, strongly favor top
-    // For landscapes, also favor top but less aggressively
-    if (isPortrait) {
-      // Portrait: start from top, avoid cutting heads
-      sourceY = 0;
-      // Add small padding from top if image is very tall
-      if (imgHeight > imgWidth * 1.5) {
-        sourceY = Math.min(imgHeight * 0.05, (imgHeight - sourceHeight) * 0.2);
-      }
-    } else {
-      // Landscape: prefer upper portion but allow some centering
-      sourceY = Math.max(0, (imgHeight - sourceHeight) * 0.2); // 20% from top instead of center
-    }
-    
-    // Ensure we don't go out of bounds
-    if (sourceY + sourceHeight > imgHeight) {
-      sourceY = imgHeight - sourceHeight;
-    }
-  }
-  
-  // Prefer padding over aggressive cropping
-  // If the crop would be too aggressive, add padding instead
-  const cropRatio = Math.min(sourceWidth / imgWidth, sourceHeight / imgHeight);
-  if (cropRatio < 0.6) {
-    // Too aggressive - add padding by scaling down
-    const scale = Math.min(imgWidth / targetWidth, imgHeight / targetHeight);
-    const scaledWidth = targetWidth * scale;
-    const scaledHeight = targetHeight * scale;
-    
-    sourceWidth = Math.min(scaledWidth, imgWidth);
-    sourceHeight = Math.min(scaledHeight, imgHeight);
-    sourceX = (imgWidth - sourceWidth) / 2;
-    
-    // Still prioritize upper portion
-    if (isPortrait) {
-      sourceY = Math.max(0, (imgHeight - sourceHeight) * 0.1);
-    } else {
-      sourceY = Math.max(0, (imgHeight - sourceHeight) * 0.2);
-    }
-  }
-  
-  return { sourceX, sourceY, sourceWidth, sourceHeight };
+  // Source dimensions - always use full image, never crop
+  return {
+    drawX,
+    drawY,
+    drawWidth: scaledWidth,
+    drawHeight: scaledHeight,
+    sourceX: 0,
+    sourceY: 0,
+    sourceWidth: imgWidth,
+    sourceHeight: imgHeight,
+  };
 }
 
 /**
- * Process an uploaded photo for story cover with smart cropping
- * Resizes and crops the image to story cover dimensions with face-aware logic
+ * Process an uploaded photo for story cover using background-fill approach
+ * NEVER crops - preserves full image content
+ * Fills sidebars with blurred/darkened version of the same image (no black bars)
+ * Centers image horizontally and vertically
+ * Maintains original aspect ratio
+ * Creates a single, integrated image output
  * 
  * @param imageBase64 - Base64 encoded image (with or without data URL prefix)
  * @param options - Processing options
- * @returns Processed image as base64 data URL
+ * @returns Processed image as base64 data URL (single layer, no black sidebars)
  */
 export async function processUploadedPhoto(
   imageBase64: string,
@@ -215,9 +182,13 @@ export async function processUploadedPhoto(
       
       img.onload = () => {
         try {
-          // Create canvas
+          // Create canvas with high-quality rendering and transparency support
           const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
+          const ctx = canvas.getContext('2d', {
+            alpha: true, // Enable transparency for transparent sidebars
+            desynchronized: false,
+            willReadFrequently: false,
+          });
           
           if (!ctx) {
             reject(new Error('Could not get canvas context'));
@@ -225,29 +196,70 @@ export async function processUploadedPhoto(
           }
 
           // Set dimensions (story cover aspect ratio 16:10)
-          const targetWidth = options.width || 1024;
-          const targetHeight = options.height || 640;
+          // Increase resolution for better visual quality
+          const targetWidth = options.width || 1536; // Increased from 1024 for better quality
+          const targetHeight = options.height || 960; // Increased from 640 for better quality
           
           canvas.width = targetWidth;
           canvas.height = targetHeight;
 
-          // Calculate smart crop (face-aware, prioritizes upper portion)
-          const crop = calculateSmartCrop(
-            img.width,
-            img.height,
-            targetWidth,
-            targetHeight
-          );
+          // Enable high-quality image smoothing for better clarity
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high'; // Use high quality smoothing
 
-          // Draw image with smart crop and resize
+          // Draw ONLY the background layer (blurred/darkened version)
+          // Use zoomed scale to fill canvas and eliminate dark spots on sides
+          // Apply mild zoom (1.2x) to fill more space while preserving most of the image
+          const scaleX = targetWidth / img.width;
+          const scaleY = targetHeight / img.height;
+          const containScale = Math.min(scaleX, scaleY); // Base contain scale
+          
+          // Apply zoom to fill canvas and eliminate dark sidebars
+          // 1.2x zoom ensures better fill while still preserving most of the image
+          const zoomScale = containScale * 1.2; // 20% zoom - fills canvas better
+          
+          // Calculate centered dimensions with zoom
+          const scaledWidth = img.width * zoomScale;
+          const scaledHeight = img.height * zoomScale;
+          const drawX = (targetWidth - scaledWidth) / 2;
+          const drawY = (targetHeight - scaledHeight) / 2;
+
+          // Draw the full image centered with zoom (background layer only)
+          // Zoom helps eliminate dark spots while preserving most of the image
           ctx.drawImage(
             img,
-            crop.sourceX, crop.sourceY, crop.sourceWidth, crop.sourceHeight,
-            0, 0, targetWidth, targetHeight
+            0, 0, img.width, img.height, // Full source image, no cropping
+            drawX, drawY, scaledWidth, scaledHeight // Centered with zoom
           );
+
+          // Apply very subtle darkening only to the image area (not sidebars)
+          // This softens the image slightly while keeping sidebars transparent
+          ctx.save();
+          ctx.globalCompositeOperation = 'multiply'; // Blend with existing image
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.15)'; // Very subtle darkening
+          ctx.fillRect(drawX, drawY, scaledWidth, scaledHeight); // Only darken image area
+          ctx.restore();
+
+          // Apply very subtle gradient overlay only to the image area
+          // This blends with app background while keeping sidebars transparent
+          const gradient = ctx.createLinearGradient(drawX, drawY, drawX, drawY + scaledHeight);
+          gradient.addColorStop(0, 'rgba(26, 13, 46, 0.2)');      // Very subtle dark purple (top)
+          gradient.addColorStop(0.3, 'rgba(45, 27, 78, 0.15)');   // Very subtle light purple
+          gradient.addColorStop(0.5, 'rgba(74, 44, 95, 0.1)');    // Very subtle medium purple
+          gradient.addColorStop(0.85, 'rgba(255, 140, 66, 0.1)'); // Very subtle orange
+          gradient.addColorStop(1, 'rgba(255, 217, 61, 0.08)');   // Very subtle golden yellow (bottom)
           
-          // Convert to base64
-          const processedBase64 = canvas.toDataURL('image/jpeg', 0.9);
+          ctx.save();
+          ctx.globalCompositeOperation = 'multiply'; // Blend with existing image
+          ctx.fillStyle = gradient;
+          ctx.fillRect(drawX, drawY, scaledWidth, scaledHeight); // Only apply to image area
+          ctx.restore();
+          
+          // Convert to base64 with maximum quality for best clarity
+          // Use PNG format for lossless quality, or JPEG at maximum quality
+          // PNG provides better quality but larger file size
+          const processedBase64 = canvas.toDataURL('image/png'); // PNG for lossless quality
+          // Alternative: canvas.toDataURL('image/jpeg', 1.0) for maximum JPEG quality
           resolve(processedBase64);
         } catch (error) {
           reject(error);

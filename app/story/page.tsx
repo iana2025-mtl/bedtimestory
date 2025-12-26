@@ -299,11 +299,11 @@ export default function StoryPage() {
       setError(null);
       setCurrentVisualStyle(visualStyle);
 
-      // Step 1: Smart cropping (prioritizes faces, upper portion, avoids cutting heads)
+      // Step 1: Process photo with higher resolution for better quality
       const croppedImage = await processUploadedPhoto(photoBase64, {
         visualStyle,
-        width: 1024,
-        height: 640,
+        width: 1536, // Increased from 1024 for better resolution
+        height: 960, // Increased from 640 for better resolution
       });
 
       // CRITICAL: Check if request is still valid before continuing
@@ -501,12 +501,21 @@ export default function StoryPage() {
               <img
                 src={generatedImageUrl}
                 alt="Story cover"
-                className="w-full h-auto object-contain max-h-96 mx-auto rounded-xl relative z-10"
+                className="w-full h-auto rounded-xl relative z-10"
                 style={isUploadedPhoto && currentVisualStyle.length > 0 ? {
                   filter: getStyleFilterCSS(currentVisualStyle),
                   borderRadius: '12px',
+                  display: 'block',
+                  width: '100%',
+                  height: 'auto',
+                  objectFit: 'fill', // Fill container - processed image has background layer
                 } : {
                   borderRadius: '12px',
+                  display: 'block',
+                  width: '100%',
+                  height: 'auto',
+                  objectFit: 'contain',
+                  maxHeight: '24rem',
                 }}
                 onError={(e) => {
                   console.error('Failed to load story cover image:', generatedImageUrl);
