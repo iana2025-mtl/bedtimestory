@@ -10,91 +10,113 @@
  */
 
 export interface ImageProcessingOptions {
-  visualStyle: string[];
+  visualStyle: string | string[]; // Can be single string or array (for backward compatibility)
   width?: number;
   height?: number;
 }
 
 /**
  * Style filter configurations (CSS filter values)
+ * Based on Visual Style Definitions - Source of Truth
+ * 
+ * Filters are applied subtly and non-destructively to uploaded photos:
+ * - Saturation: Controls color intensity
+ * - Contrast: Controls difference between light and dark
+ * - Softness: Controlled via brightness and blur (for soft outlines)
+ * - Warmth: Controlled via sepia (adds warmth/tone)
  */
-const styleFilters: Record<string, { 
-  brightness: string; 
-  contrast: string; 
-  saturate: string; 
-  sepia: string;
-  blur?: string;
-}> = {
+interface StyleFilter {
+  brightness: string;  // Softness control (higher = softer/brighter)
+  contrast: string;    // Line definition (higher = cleaner lines, lower = softer)
+  saturate: string;    // Color intensity (higher = brighter colors)
+  sepia: string;       // Warmth control (adds warm tone)
+  blur?: string;       // Softness for outlines (soft blur for cartoon/fantasy)
+}
+
+const styleFilters: Record<string, StyleFilter> = {
+  // Cartoon: Bright colors, Soft outlines, Simple shapes
+  // Filters MUST be visible and noticeable
   'Cartoon': { 
-    brightness: '108%', 
-    contrast: '115%', 
-    saturate: '125%', 
-    sepia: '8%',
-    blur: '0.5px',
+    brightness: '110%',  // Noticeably brighter for soft feel
+    contrast: '108%',    // Reduced contrast for soft outlines
+    saturate: '135%',    // Increased saturation for bright colors (more visible)
+    sepia: '8%',         // Added warmth for cartoon feel
+    blur: '0.8px',       // Soft blur for soft outlines (more visible)
   },
-  'Realistic': { 
-    brightness: '102%', 
-    contrast: '105%', 
-    saturate: '105%', 
-    sepia: '3%',
-    blur: '0.3px',
-  },
+  // Fantasy: Magical lighting, Pastel glow, Whimsical elements
   'Fantasy': { 
-    brightness: '110%', 
-    contrast: '108%', 
-    saturate: '135%', 
-    sepia: '12%',
+    brightness: '115%',  // Brighter for magical lighting and pastel glow (more visible)
+    contrast: '102%',    // Lower contrast for soft, pastel appearance
+    saturate: '125%',    // Moderate saturation with pastel feel (more visible)
+    sepia: '12%',        // More warmth for magical glow (more visible)
+    blur: '0.9px',       // Softer blur for ethereal, whimsical feel (more visible)
+  },
+  // Modern: Clean lines, Muted color palette, Minimalist look
+  'Modern': { 
+    brightness: '105%',  // Slightly brighter
+    contrast: '120%',    // Higher contrast for clean lines (more visible)
+    saturate: '85%',     // Reduced saturation for muted color palette (more noticeable)
+    sepia: '3%',         // Minimal warmth for clean, modern look
+    blur: '0.3px',       // Minimal blur for clean lines
+  },
+  // Realistic: Natural lighting, High detail, Lifelike proportions
+  'Realistic': { 
+    brightness: '104%',  // Subtle brightness for natural lighting (slightly more visible)
+    contrast: '106%',    // Subtle contrast to preserve detail (slightly more visible)
+    saturate: '105%',    // Subtle saturation boost (more visible than before)
+    sepia: '2%',         // Minimal warmth to keep natural look
+    blur: '0px',         // No blur to preserve high detail
+  },
+  // French translations (must match English values)
+  'Dessin animé': { 
+    brightness: '110%',
+    contrast: '108%',
+    saturate: '135%',
+    sepia: '8%',
     blur: '0.8px',
   },
-  'Modern': { 
-    brightness: '105%', 
-    contrast: '125%', 
-    saturate: '108%', 
-    sepia: '4%',
-    blur: '0.4px',
+  'Fantastique': { 
+    brightness: '115%',
+    contrast: '102%',
+    saturate: '125%',
+    sepia: '12%',
+    blur: '0.9px',
   },
-  'Dessin animé': { 
-    brightness: '108%', 
-    contrast: '115%', 
-    saturate: '125%', 
-    sepia: '8%',
-    blur: '0.5px',
-  }, // French
-  'Réaliste': { 
-    brightness: '102%', 
-    contrast: '105%', 
-    saturate: '105%', 
+  'Moderne': { 
+    brightness: '105%',
+    contrast: '120%',
+    saturate: '85%',
     sepia: '3%',
     blur: '0.3px',
-  }, // French
-  'Fantastique': { 
-    brightness: '110%', 
-    contrast: '108%', 
-    saturate: '135%', 
-    sepia: '12%',
-    blur: '0.8px',
-  }, // French
-  'Moderne': { 
-    brightness: '105%', 
-    contrast: '125%', 
-    saturate: '108%', 
-    sepia: '4%',
-    blur: '0.4px',
-  }, // French
+  },
+  'Réaliste': { 
+    brightness: '104%',
+    contrast: '106%',
+    saturate: '105%',
+    sepia: '2%',
+    blur: '0px',
+  },
 };
 
 /**
  * Get CSS filter string for a given visual style
- * Enhanced with subtle magical glow and warmth while preserving photo authenticity
+ * Applies subtle, non-destructive filters based on style definitions
+ * Ensures only ONE style is applied at a time
+ * 
+ * @param visualStyle - Style name as string or array (uses first element if array)
+ * @returns CSS filter string with brightness, contrast, saturation, sepia, and optional blur
  */
-export function getStyleFilterCSS(visualStyle: string[]): string {
-  const style = visualStyle[0] || 'Realistic';
+export function getStyleFilterCSS(visualStyle: string | string[]): string {
+  // Handle both array and string input (backward compatibility)
+  const style = Array.isArray(visualStyle) ? (visualStyle[0] || 'Realistic') : (visualStyle || 'Realistic');
   const filters = styleFilters[style] || styleFilters['Realistic'];
   
+  // Build filter string with all style-specific adjustments
+  // Filters must always be applied to uploaded images when a style is selected
   let filterString = `brightness(${filters.brightness}) contrast(${filters.contrast}) saturate(${filters.saturate}) sepia(${filters.sepia})`;
   
-  // Add subtle blur for soft glow effect
-  if (filters.blur) {
+  // Add blur only if specified (for softness/soft outlines)
+  if (filters.blur && filters.blur !== '0px' && filters.blur !== '0') {
     filterString += ` blur(${filters.blur})`;
   }
   
@@ -104,10 +126,13 @@ export function getStyleFilterCSS(visualStyle: string[]): string {
 /**
  * Get enhanced CSS filter with glow effect wrapper
  * Adds a subtle magical glow around the image
+ * 
+ * @param visualStyle - Style name as string or array (uses first element if array)
+ * @returns CSS filter string (currently same as base filter, can be enhanced)
  */
-export function getEnhancedStyleFilterCSS(visualStyle: string[]): string {
+export function getEnhancedStyleFilterCSS(visualStyle: string | string[]): string {
   const baseFilter = getStyleFilterCSS(visualStyle);
-  // Add subtle drop shadow for glow effect
+  // Base implementation - can be enhanced with additional effects if needed
   return baseFilter;
 }
 

@@ -75,7 +75,7 @@ export const translations: Record<Language, Translations> = {
       somethingElse: 'Something Else',
       clickToUpload: 'Click to upload photo',
       clickToChangePhoto: 'Click to change photo',
-      fileTypes: 'PNG, JPG, GIF up to 10MB',
+      fileTypes: 'JPEG, JPG, PNG, WebP up to 10MB',
     },
     story: {
       newStory: 'New Story',
@@ -122,7 +122,7 @@ export const translations: Record<Language, Translations> = {
       somethingElse: 'Autre chose',
       clickToUpload: 'Cliquez pour télécharger une photo',
       clickToChangePhoto: 'Cliquez pour changer la photo',
-      fileTypes: 'PNG, JPG, GIF jusqu\'à 10 Mo',
+      fileTypes: 'JPEG, JPG, PNG, WebP jusqu\'à 10 Mo',
     },
     story: {
       newStory: 'Nouvelle Histoire',

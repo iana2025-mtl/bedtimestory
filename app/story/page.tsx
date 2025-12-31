@@ -36,7 +36,7 @@ export default function StoryPage() {
   const [story, setStory] = useState<StoryData | null>(null);
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
   const [isUploadedPhoto, setIsUploadedPhoto] = useState(false); // Track if image is from uploaded photo
-  const [currentVisualStyle, setCurrentVisualStyle] = useState<string[]>([]); // Store visual style for CSS filters
+  const [currentVisualStyle, setCurrentVisualStyle] = useState<string | string[]>([]); // Store visual style for CSS filters
   const [isGeneratingStory, setIsGeneratingStory] = useState(true);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -77,7 +77,6 @@ export default function StoryPage() {
           imageLockedRef.current = true; // Lock the image - it's final
           imageGenerationStartedRef.current = true; // Mark as already generated
           initializationCompleteRef.current = true; // Mark initialization as complete
-          console.log('Restored and locked persisted story cover image');
           return; // Exit early - image is locked, no generation needed
         }
       } catch (err) {
@@ -146,9 +145,14 @@ export default function StoryPage() {
 
       // After story is generated, handle story cover image
       // CRITICAL: Only generate ONCE if image is not locked and generation hasn't started
+      // Check if visual style exists (handle both array and string formats)
+      const hasVisualStyle = Array.isArray(data.visualStyle) 
+        ? data.visualStyle.length > 0 
+        : !!data.visualStyle;
+      
       if (
         data.includeImages === true && 
-        data.visualStyle.length > 0 &&
+        hasVisualStyle &&
         !imageLockedRef.current &&
         !imageGenerationStartedRef.current
       ) {
@@ -167,7 +171,8 @@ export default function StoryPage() {
             data.visualStyle,
             data.customVisualStyle,
             data.photoDescription,
-            data.children
+            data.children,
+            data.enjoyedCharacters || []
           );
         }
       }
@@ -186,11 +191,12 @@ export default function StoryPage() {
     visualStyle: string[],
     customVisualStyle: string,
     photoDescription: string,
-    children: Array<{ name: string; age: string }>
+    children: Array<{ name: string; age: string }>,
+    enjoyedCharacters: string[]
   ) => {
     // CRITICAL: Check if image is already locked - if so, do nothing
     if (imageLockedRef.current) {
-      console.log('Image is locked - skipping generation');
+      // Image is locked - skipping generation
       return;
     }
 
@@ -201,18 +207,20 @@ export default function StoryPage() {
       setIsGeneratingImage(true);
       setError(null);
 
-      const stylePrompt = customVisualStyle || visualStyle.join(' and ');
-
+      // The API will extract the single style and apply style-specific modifiers
+      // Only pass customVisualStyle as prompt if provided, otherwise let API build style-specific prompt
       const response = await fetch('/api/generate-image', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          visualStyle,
+          visualStyle, // Pass as-is (array or string), API handles single style extraction
           photoDescription: photoDescription,
           children: children,
-          prompt: `Create a beautiful ${stylePrompt} style illustration for a children's bedtime story book cover. ${photoDescription ? `The illustration should feature: ${photoDescription}.` : children.length > 0 ? `The illustration should feature ${children.map(c => c.name || 'child').join(' and ')}.` : ''} The style should be ${stylePrompt}, colorful, friendly, and magical, with soft lighting suitable for a bedtime story.`,
+          enjoyedCharacters: enjoyedCharacters, // Pass theme for companion inclusion
+          // Only include prompt if customVisualStyle is provided, otherwise API builds style-specific prompt
+          ...(customVisualStyle ? { prompt: customVisualStyle } : {}),
         }),
       });
 
@@ -220,13 +228,13 @@ export default function StoryPage() {
 
       // CRITICAL: Check if this response is still valid (not a late/duplicate response)
       if (requestId !== generationRequestIdRef.current) {
-        console.log('Ignoring late/duplicate image generation response');
+        // Ignoring late/duplicate image generation response
         return;
       }
 
       // CRITICAL: Double-check lock before setting image
       if (imageLockedRef.current) {
-        console.log('Image was locked during generation - ignoring response');
+        // Image was locked during generation - ignoring response
         return;
       }
 
@@ -246,7 +254,7 @@ export default function StoryPage() {
       
       // CRITICAL: Final check before setting and locking
       if (imageLockedRef.current || requestId !== generationRequestIdRef.current) {
-        console.log('Image locked or request outdated - ignoring response');
+        // Image locked or request outdated - ignoring response
         return;
       }
       
@@ -287,7 +295,7 @@ export default function StoryPage() {
   ) => {
     // CRITICAL: Check if image is already locked - if so, do nothing
     if (imageLockedRef.current) {
-      console.log('Image is locked - skipping processing');
+      // Image is locked - skipping processing
       return;
     }
 
@@ -308,7 +316,7 @@ export default function StoryPage() {
 
       // CRITICAL: Check if request is still valid before continuing
       if (requestId !== generationRequestIdRef.current || imageLockedRef.current) {
-        console.log('Request outdated or image locked - stopping processing');
+        // Request outdated or image locked - stopping processing
         return;
       }
 
@@ -323,7 +331,7 @@ export default function StoryPage() {
         
         // CRITICAL: Check again before using enhanced image
         if (requestId !== generationRequestIdRef.current || imageLockedRef.current) {
-          console.log('Request outdated or image locked - using cropped image only');
+          // Request outdated or image locked - using cropped image only
           finalImage = croppedImage;
         } else if (enhancedImage) {
           // AI enhancement succeeded
@@ -337,13 +345,18 @@ export default function StoryPage() {
 
       // CRITICAL: Final check before setting and locking
       if (imageLockedRef.current || requestId !== generationRequestIdRef.current) {
-        console.log('Image locked or request outdated - ignoring processed image');
+        // Image locked or request outdated - ignoring processed image
         return;
       }
 
       // Mark as uploaded photo (will apply CSS filters)
       setIsUploadedPhoto(true);
       setGeneratedImageUrl(finalImage);
+      
+      // Ensure visual style is set for filter application
+      if (visualStyle && (Array.isArray(visualStyle) ? visualStyle.length > 0 : !!visualStyle)) {
+        setCurrentVisualStyle(visualStyle);
+      }
       
       // CRITICAL: Lock the image immediately after setting it
       imageLockedRef.current = true;
@@ -429,7 +442,7 @@ export default function StoryPage() {
         timestamp: Date.now(),
       };
       sessionStorage.setItem('storyCoverImage', JSON.stringify(imageData));
-      console.log('Story cover image persisted');
+      // Image persisted successfully
     } catch (err) {
       console.warn('Failed to persist story cover image:', err);
     }
@@ -489,7 +502,7 @@ export default function StoryPage() {
           ) : generatedImageUrl ? (
             <div className="w-full rounded-xl overflow-hidden border-2 border-[rgba(30,58,95,0.6)] relative">
               {/* Glow effect wrapper for uploaded photos */}
-              {isUploadedPhoto && currentVisualStyle.length > 0 && (
+              {isUploadedPhoto && (Array.isArray(currentVisualStyle) ? currentVisualStyle.length > 0 : !!currentVisualStyle) && (
                 <div 
                   className="absolute inset-0 rounded-xl pointer-events-none"
                   style={{
@@ -502,20 +515,24 @@ export default function StoryPage() {
                 src={generatedImageUrl}
                 alt="Story cover"
                 className="w-full h-auto rounded-xl relative z-10"
-                style={isUploadedPhoto && currentVisualStyle.length > 0 ? {
-                  filter: getStyleFilterCSS(currentVisualStyle),
+                style={{
                   borderRadius: '12px',
                   display: 'block',
                   width: '100%',
                   height: 'auto',
-                  objectFit: 'fill', // Fill container - processed image has background layer
-                } : {
-                  borderRadius: '12px',
-                  display: 'block',
-                  width: '100%',
-                  height: 'auto',
-                  objectFit: 'contain',
-                  maxHeight: '24rem',
+                  // CRITICAL: Always apply filters to uploaded photos when visual style is selected
+                  // Filters MUST be applied - this is non-negotiable
+                  ...(isUploadedPhoto && (Array.isArray(currentVisualStyle) ? currentVisualStyle.length > 0 : !!currentVisualStyle) ? {
+                    filter: getStyleFilterCSS(currentVisualStyle),
+                    WebkitFilter: getStyleFilterCSS(currentVisualStyle), // Webkit prefix for Safari compatibility
+                    objectFit: 'fill' as const, // Fill container - processed image has background layer
+                  } : {
+                    objectFit: 'contain' as const,
+                    maxHeight: '24rem',
+                  }),
+                }}
+                onLoad={() => {
+                  // Image loaded successfully - filters applied via CSS
                 }}
                 onError={(e) => {
                   console.error('Failed to load story cover image:', generatedImageUrl);

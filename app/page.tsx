@@ -18,17 +18,18 @@ export default function Home() {
     { name: '', age: '' },
     { name: '', age: '' },
   ]);
-  const [enjoyedCharacters, setEnjoyedCharacters] = useState<string[]>([]);
+  const [enjoyedCharacters, setEnjoyedCharacters] = useState<string>('');
   const [customCharacters, setCustomCharacters] = useState('');
-  const [teachingThemes, setTeachingThemes] = useState<string[]>([]);
+  const [teachingThemes, setTeachingThemes] = useState<string>('');
   const [customTeachingTheme, setCustomTeachingTheme] = useState('');
   const [storyLength, setStoryLength] = useState<string>('');
   const [includeImages, setIncludeImages] = useState<boolean | null>(null);
   const [uploadedPhoto, setUploadedPhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [photoDescription, setPhotoDescription] = useState('');
-  const [visualStyle, setVisualStyle] = useState<string[]>([]);
+  const [visualStyle, setVisualStyle] = useState<string>('');
   const [customVisualStyle, setCustomVisualStyle] = useState('');
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const characterOptions = t.options.characters;
   const teachingThemeOptions = t.options.themes;
@@ -40,28 +41,75 @@ export default function Home() {
     setChildren(updated);
   };
 
-  const toggleSelection = (
+  // Single-select handler (radio button style)
+  const handleSingleSelect = (
     item: string,
-    selectedItems: string[],
-    setSelectedItems: (items: string[]) => void
+    currentValue: string,
+    setValue: (value: string) => void
   ) => {
-    if (selectedItems.includes(item)) {
-      setSelectedItems(selectedItems.filter((i) => i !== item));
+    // If clicking the same item, deselect it (allow clearing selection)
+    if (currentValue === item) {
+      setValue('');
     } else {
-      setSelectedItems([...selectedItems, item]);
+      setValue(item);
     }
   };
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setUploadedPhoto(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPhotoPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+    if (!file) {
+      return;
     }
+
+    // Constants for validation
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB in bytes
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    
+    // Validate file size first (10 MB limit)
+    if (file.size > MAX_FILE_SIZE) {
+      setUploadError('Image size must be 10MB or less.');
+      setUploadedPhoto(null);
+      setPhotoPreview(null);
+      // Clear the input
+      e.target.value = '';
+      return;
+    }
+
+    // Validate file type
+    // Note: 'image/jpeg' is the correct MIME type for both .jpg and .jpeg files
+    // But we also accept 'image/jpg' for explicit .jpg files
+    const fileType = file.type.toLowerCase();
+    
+    // Also check file extension as fallback (some browsers may not set MIME type correctly)
+    const fileName = file.name.toLowerCase();
+    const hasValidExtension = fileName.endsWith('.jpg') || 
+                              fileName.endsWith('.jpeg') || 
+                              fileName.endsWith('.png') || 
+                              fileName.endsWith('.webp');
+
+    // Accept if MIME type is valid OR file extension is valid
+    if (!allowedTypes.includes(fileType) && !hasValidExtension) {
+      setUploadError('Please upload a JPG, PNG, or WebP image.');
+      setUploadedPhoto(null);
+      setPhotoPreview(null);
+      // Clear the input
+      e.target.value = '';
+      return;
+    }
+
+    // All validations passed - clear any previous errors and proceed
+    setUploadError(null);
+    setUploadedPhoto(file);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setPhotoPreview(reader.result as string);
+    };
+    reader.onerror = () => {
+      setUploadError('Failed to read the image file. Please try again.');
+      setUploadedPhoto(null);
+      setPhotoPreview(null);
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -75,16 +123,17 @@ export default function Home() {
     }
 
     // Prepare form data
+    // Convert single-select values to arrays for backward compatibility with API
     const formData = {
       children: children.filter((c) => c.name || c.age),
-      enjoyedCharacters,
+      enjoyedCharacters: enjoyedCharacters ? [enjoyedCharacters] : [],
       customCharacters,
-      teachingThemes,
+      teachingThemes: teachingThemes ? [teachingThemes] : [],
       customTeachingTheme,
       storyLength,
       includeImages,
       photoDescription,
-      visualStyle,
+      visualStyle: visualStyle ? [visualStyle] : [],
       customVisualStyle,
       photoBase64, // Include base64 photo for image generation
       language, // Include selected language for story generation
@@ -92,8 +141,6 @@ export default function Home() {
 
     // Store in sessionStorage for temporary storage (session-based)
     sessionStorage.setItem('storyFormData', JSON.stringify(formData));
-    
-    console.log('Form Data stored:', { ...formData, photoBase64: photoBase64 ? 'Base64 image data present' : 'No image' });
     
     // Navigate to story page
     router.push('/story');
@@ -168,9 +215,9 @@ export default function Home() {
                 <button
                   key={option}
                   type="button"
-                  onClick={() => toggleSelection(option, enjoyedCharacters, setEnjoyedCharacters)}
+                  onClick={() => handleSingleSelect(option, enjoyedCharacters, setEnjoyedCharacters)}
                   className={`px-4 py-3 rounded-xl border-2 transition-all duration-200 font-medium ${
-                    enjoyedCharacters.includes(option)
+                    enjoyedCharacters === option
                       ? 'bg-[#ffd93d] text-[#1a0d2e] border-[#ffd93d] shadow-lg shadow-[#ffd93d]/50 transform scale-105'
                       : 'bg-[rgba(30,58,95,0.3)] text-[#fef9e7] border-[rgba(30,58,95,0.6)] hover:border-[rgba(30,58,95,0.8)] hover:bg-[rgba(30,58,95,0.4)]'
                   }`}
@@ -198,9 +245,9 @@ export default function Home() {
                 <button
                   key={option}
                   type="button"
-                  onClick={() => toggleSelection(option, teachingThemes, setTeachingThemes)}
+                  onClick={() => handleSingleSelect(option, teachingThemes, setTeachingThemes)}
                   className={`px-4 py-3 rounded-xl border-2 transition-all duration-200 font-medium ${
-                    teachingThemes.includes(option)
+                    teachingThemes === option
                       ? 'bg-[#ffd93d] text-[#1a0d2e] border-[#ffd93d] shadow-lg shadow-[#ffd93d]/50 transform scale-105'
                       : 'bg-[rgba(30,58,95,0.3)] text-[#fef9e7] border-[rgba(30,58,95,0.6)] hover:border-[rgba(30,58,95,0.8)] hover:bg-[rgba(30,58,95,0.4)]'
                   }`}
@@ -280,7 +327,7 @@ export default function Home() {
             <div className="border-2 border-dashed border-[rgba(30,58,95,0.6)] rounded-xl p-8 text-center hover:border-[rgba(30,58,95,0.8)] transition-colors">
               <input
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/jpg,image/png,image/webp"
                 onChange={handlePhotoUpload}
                 className="hidden"
                 id="photo-upload"
@@ -306,6 +353,11 @@ export default function Home() {
                   </div>
                 )}
               </label>
+              {uploadError && (
+                <div className="mt-4 p-3 bg-[rgba(255,140,66,0.2)] border-2 border-[rgba(255,140,66,0.5)] text-[#ff8c42] rounded-lg">
+                  <p className="text-sm font-medium">{uploadError}</p>
+                </div>
+              )}
             </div>
           </section>
 
@@ -332,9 +384,9 @@ export default function Home() {
                 <button
                   key={option}
                   type="button"
-                  onClick={() => toggleSelection(option, visualStyle, setVisualStyle)}
+                  onClick={() => handleSingleSelect(option, visualStyle, setVisualStyle)}
                   className={`px-4 py-3 rounded-xl border-2 transition-all duration-200 font-medium ${
-                    visualStyle.includes(option)
+                    visualStyle === option
                       ? 'bg-[#ffd93d] text-[#1a0d2e] border-[#ffd93d] shadow-lg shadow-[#ffd93d]/50 transform scale-105'
                       : 'bg-[rgba(30,58,95,0.3)] text-[#fef9e7] border-[rgba(30,58,95,0.6)] hover:border-[rgba(30,58,95,0.8)] hover:bg-[rgba(30,58,95,0.4)]'
                   }`}
