@@ -195,9 +195,22 @@ export async function POST(request: NextRequest) {
     const selectedStyle = Array.isArray(visualStyle) ? visualStyle[0] : visualStyle;
     const modifiers = getStylePromptModifiers(selectedStyle);
     
+    // Composition constraints that must ALWAYS be applied (even for custom prompts)
+    const COMPOSITION_CONSTRAINTS = `
+
+COMPOSITION REQUIREMENTS (CRITICAL - MANDATORY):
+- ONE SINGLE, UNIFIED IMAGE ONLY - this is a standalone illustration, NOT a book
+- ONE continuous, seamless canvas with NO divisions, NO splits, NO panels
+- ONE cohesive scene with a single focal point centered in the frame
+- FORBIDDEN: book, storybook, open book, pages, spread, split panels, diptych, two-page layout
+- This must be ONE seamless, unified composition like a poster or art print`;
+
     let imagePrompt = prompt;
     
-    if (!imagePrompt) {
+    // If custom prompt is provided, append composition constraints to ensure unified image
+    if (imagePrompt) {
+      imagePrompt = `${imagePrompt}${COMPOSITION_CONSTRAINTS}`;
+    } else {
       // HARD REQUIREMENT 1: Count children exactly as provided
       const childCount = children && children.length > 0 ? children.length : 0;
       const childCountDescription = childCount === 1 
@@ -223,7 +236,31 @@ export async function POST(request: NextRequest) {
       
       // Build prompt with style-specific modifiers, exact child count, and theme companions
       // CRITICAL: Explicitly prevent split/two-page layouts - must be ONE single, unified image
-      imagePrompt = `Create a beautiful ${modifiers.artisticTone} illustration for a children's bedtime story book cover. 
+      // Composition requirements MUST come first to override any "book cover" associations
+      imagePrompt = `Create a beautiful ${modifiers.artisticTone} illustration for a children's bedtime story. 
+
+COMPOSITION REQUIREMENTS (CRITICAL - HIGHEST PRIORITY):
+- ONE SINGLE, UNIFIED IMAGE ONLY - this is a standalone illustration, NOT a book
+- ONE continuous, seamless canvas with NO divisions, NO splits, NO panels
+- ONE cohesive scene with a single focal point centered in the frame
+- The entire image must be one seamless, unified composition
+- This is a poster-style illustration, NOT a book, NOT pages, NOT a spread
+
+EXPLICIT FORBIDDEN ELEMENTS (MUST NOT APPEAR):
+- FORBIDDEN: book, storybook, open book, closed book, book pages, book spread
+- FORBIDDEN: two-page layout, split pages, left page, right page
+- FORBIDDEN: split panels, diptych, triptych, multi-panel layout
+- FORBIDDEN: mirrored composition, dual-frame layout, side-by-side scenes
+- FORBIDDEN: book binding, book spine, book edges, page divisions
+- FORBIDDEN: any visual element that suggests a book or multiple pages
+- FORBIDDEN: vertical or horizontal lines dividing the image
+- The image must be ONE scene, ONE composition, ONE unified image
+
+REQUIRED COMPOSITION STYLE:
+- Full-frame illustration like a movie poster or art print
+- Single continuous scene with seamless background
+- All elements must exist in ONE unified space
+- No visual breaks, divisions, or separations of any kind
 
 CHILD COUNT REQUIREMENT (HARD CONSTRAINT):
 - Show ${childCountDescription}${childNamesText}
@@ -244,16 +281,10 @@ STYLE REQUIREMENTS:
 - Include ${modifiers.detailLevel}
 - The illustration should be child-friendly, warm, and inviting, suitable for a bedtime story
 
-COMPOSITION REQUIREMENTS (CRITICAL):
-- ONE SINGLE, UNIFIED IMAGE ONLY
-- Single continuous canvas with no divisions
-- Single focal scene centered in frame
-- NO book pages, NO open book, NO storybook spread
-- NO split panels, NO diptychs, NO left/right framing
-- NO double panel layouts, NO mirrored compositions
-- NO book-style layouts of any kind
-- The image must be a standalone illustration like a poster or cover art
-- One cohesive scene, not multiple scenes or pages`;
+FINAL REMINDER - COMPOSITION:
+- This is ONE image, ONE scene, ONE unified composition
+- NOT a book, NOT pages, NOT a spread
+- ONE seamless, continuous illustration`;
     }
 
     // Generate image using DALL-E 3

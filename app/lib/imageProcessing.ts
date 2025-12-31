@@ -281,18 +281,19 @@ export async function processUploadedPhoto(
           ctx.restore();
           
           // Convert to base64 with maximum quality for best clarity
-          // Use PNG format for lossless quality, or JPEG at maximum quality
-          // PNG provides better quality but larger file size
-          const processedBase64 = canvas.toDataURL('image/png'); // PNG for lossless quality
-          // Alternative: canvas.toDataURL('image/jpeg', 1.0) for maximum JPEG quality
+          // Use PNG format for lossless quality (supports transparency)
+          // PNG provides better quality and works for all input formats (JPEG, PNG, WebP)
+          const processedBase64 = canvas.toDataURL('image/png'); // PNG for lossless quality and format compatibility
           resolve(processedBase64);
         } catch (error) {
-          reject(error);
+          console.error('Error in image processing canvas operations:', error);
+          reject(new Error(`Image processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`));
         }
       };
       
-      img.onerror = () => {
-        reject(new Error('Failed to load image'));
+      img.onerror = (error) => {
+        console.error('Failed to load image for processing:', error);
+        reject(new Error('Failed to load image. Please ensure the image is in a supported format (JPEG, PNG, or WebP).'));
       };
       
       // Handle base64 with or without data URL prefix
@@ -301,7 +302,27 @@ export async function processUploadedPhoto(
         // Try common image formats
         // Check if it looks like base64 (alphanumeric with possible +, /, =)
         if (/^[A-Za-z0-9+/=]+$/.test(imageBase64)) {
-          imageSrc = `data:image/jpeg;base64,${imageBase64}`;
+          // Try to detect format from base64 header (magic bytes)
+          // PNG files start with: 89 50 4E 47 0D 0A 1A 0A (base64: iVBORw0KGgo...)
+          // JPEG files start with: FF D8 FF (base64: /9j/...)
+          // WebP files start with: RIFF...WEBP (base64: UklGR...)
+          const base64Header = imageBase64.substring(0, 12);
+          let mimeType = 'image/jpeg'; // Default to JPEG for backward compatibility
+          
+          // PNG detection: base64 of PNG signature (89 50 4E 47) = "iVBORw0KGgo"
+          if (base64Header.startsWith('iVBORw0KGgo') || base64Header.startsWith('iVBORw0K')) {
+            mimeType = 'image/png';
+          } 
+          // JPEG detection: base64 of JPEG signature (FF D8 FF) = "/9j/"
+          else if (base64Header.startsWith('/9j/')) {
+            mimeType = 'image/jpeg';
+          }
+          // WebP detection: base64 of "RIFF" = "UklGR"
+          else if (base64Header.startsWith('UklGR')) {
+            mimeType = 'image/webp';
+          }
+          
+          imageSrc = `data:${mimeType};base64,${imageBase64}`;
         } else {
           reject(new Error('Invalid image format'));
           return;

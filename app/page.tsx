@@ -115,15 +115,9 @@ export default function Home() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Convert photo to base64 if uploaded
-    let photoBase64: string | null = null;
-    if (uploadedPhoto && photoPreview) {
-      // photoPreview is already base64 from FileReader
-      photoBase64 = photoPreview.split(',')[1]; // Remove data:image/...;base64, prefix
-    }
-
-    // Prepare form data
-    // Convert single-select values to arrays for backward compatibility with API
+    // Prepare form data WITHOUT photoBase64 to avoid QuotaExceededError
+    // Base64 images can be very large (several MB) and exceed sessionStorage quota (5-10MB)
+    // Store photo separately with error handling
     const formData = {
       children: children.filter((c) => c.name || c.age),
       enjoyedCharacters: enjoyedCharacters ? [enjoyedCharacters] : [],
@@ -135,12 +129,35 @@ export default function Home() {
       photoDescription,
       visualStyle: visualStyle ? [visualStyle] : [],
       customVisualStyle,
-      photoBase64, // Include base64 photo for image generation
+      hasUploadedPhoto: !!(uploadedPhoto && photoPreview), // Flag indicating image was uploaded
       language, // Include selected language for story generation
     };
 
-    // Store in sessionStorage for temporary storage (session-based)
-    sessionStorage.setItem('storyFormData', JSON.stringify(formData));
+    // Store form data in sessionStorage (small, always fits)
+    try {
+      sessionStorage.setItem('storyFormData', JSON.stringify(formData));
+    } catch (error) {
+      console.error('Failed to store form data:', error);
+      setUploadError('Failed to save form data. Please try again.');
+      return;
+    }
+
+    // Store photoBase64 separately with error handling for quota limits
+    // If quota is exceeded, we gracefully degrade to AI image generation
+    if (uploadedPhoto && photoPreview) {
+      try {
+        const base64Part = photoPreview.includes(',') ? photoPreview.split(',')[1] : photoPreview;
+        sessionStorage.setItem('storyPhotoBase64', base64Part);
+      } catch (error) {
+        // Quota exceeded - image too large for sessionStorage
+        // This is OK - we'll generate an AI image instead (graceful degradation)
+        console.warn('Image too large for sessionStorage, will use AI image generation instead:', error);
+        sessionStorage.removeItem('storyPhotoBase64'); // Clean up if partial write occurred
+      }
+    } else {
+      // No image uploaded, ensure no old image data remains
+      sessionStorage.removeItem('storyPhotoBase64');
+    }
     
     // Navigate to story page
     router.push('/story');

@@ -17,7 +17,7 @@ interface FormData {
   photoDescription: string;
   visualStyle: string[];
   customVisualStyle: string;
-  photoBase64: string | null;
+  hasUploadedPhoto?: boolean; // Flag indicating image was uploaded (photoBase64 stored separately)
   language?: 'en' | 'fr';
 }
 
@@ -62,7 +62,25 @@ export default function StoryPage() {
     }
 
     const data = JSON.parse(storedData) as FormData;
-    setFormData(data);
+    
+    // Load photoBase64 separately (if it fits in sessionStorage)
+    // If missing due to quota limits, we'll gracefully fall back to AI image generation
+    let photoBase64: string | null = null;
+    if (data.hasUploadedPhoto) {
+      try {
+        const storedPhoto = sessionStorage.getItem('storyPhotoBase64');
+        if (storedPhoto) {
+          photoBase64 = storedPhoto;
+        }
+      } catch (error) {
+        console.warn('Failed to load photo from sessionStorage:', error);
+        // Continue without photo - will use AI image generation
+      }
+    }
+    
+    // Add photoBase64 to data object for compatibility with existing code
+    const dataWithPhoto = { ...data, photoBase64 };
+    setFormData(dataWithPhoto);
 
     // Check if story cover image is already persisted and locked
     const storedImageData = sessionStorage.getItem('storyCoverImage');
@@ -88,8 +106,8 @@ export default function StoryPage() {
     // CRITICAL: Only generate story if image is not locked
     // This prevents regeneration on re-renders, language changes, or state updates
     if (!imageLockedRef.current) {
-      // Generate story first
-      generateStory(data);
+      // Generate story first (use dataWithPhoto which includes photoBase64 if available)
+      generateStory(dataWithPhoto);
     }
     
     // Mark initialization as complete
@@ -308,7 +326,15 @@ export default function StoryPage() {
       setCurrentVisualStyle(visualStyle);
 
       // Step 1: Process photo with higher resolution for better quality
-      const croppedImage = await processUploadedPhoto(photoBase64, {
+      // photoBase64 may be just the base64 string or a full data URL
+      // processUploadedPhoto handles both formats and detects the image type
+      let imageToProcess = photoBase64;
+      // If it doesn't look like a data URL, try to reconstruct it (but function will auto-detect)
+      if (!photoBase64.startsWith('data:')) {
+        // The function will auto-detect PNG/JPEG/WebP from base64 signature
+        imageToProcess = photoBase64;
+      }
+      const croppedImage = await processUploadedPhoto(imageToProcess, {
         visualStyle,
         width: 1536, // Increased from 1024 for better resolution
         height: 960, // Increased from 640 for better resolution
@@ -369,7 +395,10 @@ export default function StoryPage() {
       // CRITICAL: Only handle error if this is still the current request
       if (requestId === generationRequestIdRef.current && !imageLockedRef.current) {
         console.error('Error processing uploaded photo:', err);
-        setError(err instanceof Error ? err.message : 'Failed to process photo');
+        const errorMessage = err instanceof Error 
+          ? err.message 
+          : 'Failed to process photo';
+        setError(`Image processing failed: ${errorMessage}. Please try a different image or check that the image format is supported (JPEG, PNG, or WebP).`);
         setIsGeneratingImage(false);
         // Reset generation flag on error so user can retry by starting new story
         imageGenerationStartedRef.current = false;
