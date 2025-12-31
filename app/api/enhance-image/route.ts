@@ -28,7 +28,21 @@ const openai = process.env.OPENAI_API_KEY
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch (jsonError) {
+      // Handle JSON parsing errors (may indicate body size limit exceeded)
+      console.error('Failed to parse request body:', jsonError);
+      return NextResponse.json(
+        { 
+          error: 'Request body too large or invalid',
+          details: 'The image file may be too large. Please use an image smaller than 10MB, or try a different image format.',
+          code: 'BODY_TOO_LARGE'
+        },
+        { status: 413 }
+      );
+    }
     const { imageBase64, visualStyle, children } = body;
 
     // Validation
