@@ -65,17 +65,22 @@ export default function StoryPage() {
     const data = JSON.parse(storedData) as FormData;
     
     // Load photoBase64 separately (if it fits in sessionStorage)
-    // If missing due to quota limits, we'll gracefully fall back to AI image generation
+    // CRITICAL: If hasUploadedPhoto is true, we MUST use the uploaded image and NOT generate AI image
+    // If photo is missing due to quota limits, we should handle gracefully but NOT fall back to AI generation
     let photoBase64: string | null = null;
     if (data.hasUploadedPhoto) {
       try {
         const storedPhoto = sessionStorage.getItem('storyPhotoBase64');
         if (storedPhoto) {
           photoBase64 = storedPhoto;
+        } else {
+          // Photo was uploaded but not stored (quota exceeded) - this is an error case
+          // We will NOT generate AI image as fallback - user uploaded an image and expects it to be used
+          console.warn('Uploaded photo exists (hasUploadedPhoto=true) but photoBase64 is missing from sessionStorage');
         }
       } catch (error) {
         console.warn('Failed to load photo from sessionStorage:', error);
-        // Continue without photo - will use AI image generation
+        // Do NOT fall back to AI image generation - user uploaded an image
       }
     }
     
@@ -178,14 +183,19 @@ export default function StoryPage() {
         // Mark generation as started to prevent duplicate calls
         imageGenerationStartedRef.current = true;
         
-        if (data.photoBase64) {
-          // CASE B: Photo uploaded - process the uploaded photo
+        // CRITICAL: Image source priority - uploaded images take precedence over AI generation
+        // If user uploaded an image (hasUploadedPhoto flag), use it and DO NOT generate AI image
+        // Only generate AI image if NO image was uploaded
+        if (data.hasUploadedPhoto && data.photoBase64) {
+          // CASE B: Photo uploaded - process the uploaded photo ONLY
+          // Do NOT generate AI image when uploaded photo exists
           processUploadedPhotoImage(
             data.photoBase64,
             data.visualStyle
           );
-        } else {
+        } else if (!data.hasUploadedPhoto) {
           // CASE A: No photo uploaded - generate AI image
+          // Only generate AI image when no upload exists
           generateAIImage(
             data.visualStyle,
             data.customVisualStyle,
@@ -193,6 +203,13 @@ export default function StoryPage() {
             data.children,
             data.enjoyedCharacters || []
           );
+        } else {
+          // Edge case: hasUploadedPhoto is true but photoBase64 is missing (quota exceeded)
+          // In this case, we should NOT generate AI image - user expected their upload to work
+          // Set error state or handle gracefully
+          console.warn('Uploaded photo was too large for storage, but user uploaded an image - not generating AI image');
+          setIsGeneratingImage(false);
+          imageGenerationStartedRef.current = false; // Reset to allow retry if needed
         }
       }
     } catch (err) {
