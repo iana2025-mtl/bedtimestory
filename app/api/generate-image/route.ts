@@ -196,18 +196,45 @@ export async function POST(request: NextRequest) {
     const modifiers = getStylePromptModifiers(selectedStyle);
     
     // Composition constraints that must ALWAYS be applied (even for custom prompts)
+    // These constraints are format-agnostic and must NEVER be skipped
     const COMPOSITION_CONSTRAINTS = `
 
-COMPOSITION REQUIREMENTS (CRITICAL - MANDATORY):
+COMPOSITION REQUIREMENTS (CRITICAL - HIGHEST PRIORITY - MANDATORY FOR ALL IMAGES):
 - ONE SINGLE, UNIFIED IMAGE ONLY - this is a standalone illustration, NOT a book
-- ONE continuous, seamless canvas with NO divisions, NO splits, NO panels
+- ONE continuous, seamless canvas with NO divisions, NO splits, NO panels, NO breaks
 - ONE cohesive scene with a single focal point centered in the frame
-- FORBIDDEN: book, storybook, open book, pages, spread, split panels, diptych, two-page layout
-- This must be ONE seamless, unified composition like a poster or art print`;
+- The entire image must be one seamless, unified composition
+- This is a poster-style illustration, NOT a book, NOT pages, NOT a spread
 
+EXPLICIT FORBIDDEN ELEMENTS (MUST NOT APPEAR):
+- FORBIDDEN: book, storybook, open book, closed book, book pages, book spread
+- FORBIDDEN: two-page layout, split pages, left page, right page
+- FORBIDDEN: split panels, diptych, triptych, multi-panel layout
+- FORBIDDEN: mirrored composition, dual-frame layout, side-by-side scenes
+- FORBIDDEN: book binding, book spine, book edges, page divisions
+- FORBIDDEN: any visual element that suggests a book or multiple pages
+- FORBIDDEN: vertical or horizontal lines dividing the image
+- The image must be ONE scene, ONE composition, ONE unified image
+
+REQUIRED COMPOSITION STYLE:
+- Full-frame illustration like a movie poster or art print
+- Single continuous scene with seamless background
+- All elements must exist in ONE unified space
+- No visual breaks, divisions, or separations of any kind
+
+FINAL COMPOSITION REMINDER:
+- This is ONE image, ONE scene, ONE unified composition
+- NOT a book, NOT pages, NOT a spread
+- ONE seamless, continuous illustration`;
+
+    // CRITICAL: Composition constraints are format-agnostic and apply to ALL image generations
+    // They are NEVER conditional on upload format (PNG, JPEG, WebP) or presence of uploaded images
+    // photoDescription and imageBase64 are NOT used in prompt construction - they do not affect layout
+    
     let imagePrompt = prompt;
     
     // If custom prompt is provided, append composition constraints to ensure unified image
+    // These constraints MUST be applied to override any potential book-related associations
     if (imagePrompt) {
       imagePrompt = `${imagePrompt}${COMPOSITION_CONSTRAINTS}`;
     } else {
