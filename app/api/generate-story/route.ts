@@ -405,22 +405,26 @@ Return only valid JSON in this exact format (no additional text, no markdown, on
       }
 
       // Parse the JSON response
+      let parsedStory: StoryResponse | null = null;
       try {
-        storyData = JSON.parse(responseContent);
+        parsedStory = JSON.parse(responseContent) as StoryResponse;
       } catch (parseError) {
         // If JSON parsing fails, try to extract JSON from the response
         const jsonMatch = responseContent.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
-          storyData = JSON.parse(jsonMatch[0]);
+          parsedStory = JSON.parse(jsonMatch[0]) as StoryResponse;
         } else {
           throw new Error('Failed to parse story JSON from OpenAI response');
         }
       }
 
       // Validate the response structure
-      if (!storyData.title || !storyData.sections || !Array.isArray(storyData.sections)) {
+      if (!parsedStory || !parsedStory.title || !parsedStory.sections || !Array.isArray(parsedStory.sections)) {
         throw new Error('Invalid story structure received from OpenAI');
       }
+
+      // Assign validated story data
+      storyData = parsedStory;
 
       // Evaluate the story
       lastEvaluation = evaluateStory(storyData, childrenData, characters, language);
