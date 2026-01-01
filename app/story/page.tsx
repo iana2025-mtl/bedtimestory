@@ -18,6 +18,7 @@ interface FormData {
   visualStyle: string[];
   customVisualStyle: string;
   hasUploadedPhoto?: boolean; // Flag indicating image was uploaded (photoBase64 stored separately)
+  photoBase64?: string | null; // Added dynamically when loading from sessionStorage
   language?: 'en' | 'fr';
 }
 
